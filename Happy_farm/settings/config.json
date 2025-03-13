@@ -1,0 +1,55 @@
+{
+    "window": {
+        "width": 800,
+        "height": 600,
+        "title": "Happy Farm",
+        "fullscreen": false,
+        "vsync": true
+    },
+
+    "game": {
+        "fps_limit": 60,
+        "debug_mode": false,
+        "language": "ru"
+    },
+
+    "graphics": {
+        "tile_size": 32,
+        "sprite_scale": 1.0,
+        "animations_enabled": true
+    },
+
+    "sound": {
+        "enabled": true,
+        "master_volume": 1.0,
+        "music_volume": 0.7,
+        "effects_volume": 0.8
+    },
+
+    "controls": {
+        "movement": {
+            "up": ["W", "UP"],
+            "down": ["S", "DOWN"],
+            "left": ["A", "LEFT"],
+            "right": ["D", "RIGHT"]
+        },
+        "actions": {
+            "interact": "E",
+            "inventory": "I",
+            "menu": "ESCAPE"
+        }
+    },
+
+    "gameplay": {
+        "player_speed": 200,
+        "interaction_radius": 32,
+        "day_length": 1200
+    },
+
+    "debug": {
+        "show_fps": true,
+        "show_hitboxes": false,
+        "show_grid": false,
+        "invincible": false
+    }
+}
