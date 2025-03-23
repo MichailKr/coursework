@@ -72,7 +72,7 @@ class Player(pygame.sprite.Sprite):
                 if os.path.exists(img_path):
                     sprite = pygame.image.load(img_path).convert_alpha()
                     # Масштабируем спрайт, если нужно
-                    sprite = pygame.transform.scale(sprite, (72, 92))
+                    sprite = pygame.transform.scale(sprite, (70, 92))
                     sprites.append(sprite)
                 else:
                     print(f"Предупреждение: Файл {img_path} не найден.")

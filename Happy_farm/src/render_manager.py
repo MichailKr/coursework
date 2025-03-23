@@ -1,9 +1,10 @@
 import pygame
-
+from Happy_farm.src.map_renderer import MapRenderer
 
 class RenderManager:
     def __init__(self, screen_manager):
         self.screen_manager = screen_manager
+        self.map_renderer = MapRenderer()
 
         # Инициализация шрифтов
         self.title_font = pygame.font.Font(None, 64)
