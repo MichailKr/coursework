@@ -4,21 +4,17 @@
 import pygame
 from pygame.math import Vector2
 
-
 class Camera:
     def __init__(self, width, height):
         """
         Инициализация камеры
-
         Args:
             width (int): Ширина видимой области (экрана)
             height (int): Высота видимой области (экрана)
         """
-        self.camera = pygame.Rect(0, 0, width, height)
         self.width = width
         self.height = height
-
-        # Границы карты (установите их позже)
+        self.offset = Vector2(0, 0)
         self.map_width = 0
         self.map_height = 0
         print("Камера инициализирована")
@@ -32,45 +28,44 @@ class Camera:
     def apply(self, entity):
         """
         Применяет смещение камеры к позиции объекта
-
         Args:
             entity: Объект с атрибутом rect
-
         Returns:
             pygame.Rect: Новый прямоугольник с учетом смещения камеры
         """
-        return pygame.Rect(entity.rect.x - self.camera.x, entity.rect.y - self.camera.y,
-                           entity.rect.width, entity.rect.height)
+        return pygame.Rect(
+            entity.rect.x - int(self.offset.x),
+            entity.rect.y - int(self.offset.y),
+            entity.rect.width,
+            entity.rect.height
+        )
 
     def apply_rect(self, rect):
-
-        return pygame.Rect(rect.x - self.camera.x, rect.y - self.camera.y,
-                           rect.width, rect.height)
+        """Применяет смещение камеры к прямоугольнику"""
+        return pygame.Rect(
+            rect.x - int(self.offset.x),
+            rect.y - int(self.offset.y),
+            rect.width,
+            rect.height
+        )
 
     def apply_point(self, x, y):
-        return x - self.camera.x, y - self.camera.y
+        """Применяет смещение камеры к точке"""
+        return (x - int(self.offset.x), y - int(self.offset.y))
 
     def update(self, target):
         """
         Обновляет позицию камеры, чтобы следовать за целью
-
         Args:
             target: Объект, за которым следует камера (обычно игрок)
         """
-        # Центрируем камеру на игроке
-        x = target.rect.centerx - self.width // 2
-        y = target.rect.centery - self.height // 2
+        # Вычисляем желаемое смещение камеры
+        self.offset.x = target.rect.centerx - self.width // 2
+        self.offset.y = target.rect.centery - self.height // 2
 
-        # Ограничиваем положение камеры границами карты
-        if self.map_width > 0 and self.map_height > 0:
-            x = max(0, min(x, self.map_width - self.width))
-            y = max(0, min(y, self.map_height - self.height))
-
-        # Устанавливаем позицию камеры
-        self.camera.x = x
-        self.camera.y = y
-        # print(f"Камера обновлена: {self.camera.x}, {self.camera.y}")
-
+        # Ограничиваем смещение камеры границами карты
+        self.offset.x = max(0, min(self.offset.x, self.map_width - self.width))
+        self.offset.y = max(0, min(self.offset.y, self.map_height - self.height))
 
 ==================== event_handler.py ====================
 
@@ -324,16 +319,22 @@ class GameManager:
         print(f"Игрок создан на позиции ({start_x}, {start_y})")
 
     def update(self):
+        """Обновляет состояние игры"""
         delta_time = self.clock.tick(self.settings['fps_limit']) / 1000.0
 
         if self.state == GameState.GAME and not self.paused:
+            # Сначала обновляем спрайты
             self.all_sprites.update(delta_time)
+
+            # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
 
+            # Отображение производительности (FPS)
             self.frame_times.append(delta_time)
             if len(self.frame_times) > 100:
                 self.frame_times.pop(0)
 
+            # Обновляем FPS каждые 500 мс
             current_time = pygame.time.get_ticks()
             if current_time - self.last_update_time > 500:
                 if self.frame_times:
@@ -341,19 +342,51 @@ class GameManager:
                 self.last_update_time = current_time
 
     def draw(self):
+        """Отрисовка текущего состояния игры"""
         screen = self.screen_manager.get_screen()
-        screen.fill((30, 30, 30))
 
         if self.state == GameState.MENU:
             self.render_manager.draw_menu(self)
         elif self.state == GameState.SETTINGS:
             self.render_manager.draw_settings(self)
         elif self.state == GameState.GAME:
+            # Очистка экрана
+            screen.fill((50, 50, 50))  # Серый фон, чтобы видеть, что экран очищается
+
+            # Отрисовка карты
             if self.map_loaded:
-                self.render_map(screen)
-            self.all_sprites.draw(screen)
+                # Отрисовка каждого слоя карты
+                for layer in self.tmx_data.visible_layers:
+                    if hasattr(layer, 'data'):  # Если это слой тайлов
+                        for x in range(layer.width):
+                            for y in range(layer.height):
+                                tile = layer.data[y][x]
+                                if tile:
+                                    # Получаем изображение тайла
+                                    tile_image = self.tmx_data.get_tile_image_by_gid(tile)
+                                    if tile_image:
+                                        # Применяем смещение камеры к координатам тайла
+                                        pos = self.camera.apply_rect(pygame.Rect(
+                                            x * self.tmx_data.tilewidth,
+                                            y * self.tmx_data.tileheight,
+                                            self.tmx_data.tilewidth,
+                                            self.tmx_data.tileheight
+                                        ))
+                                        screen.blit(tile_image, pos)
+
+            # Отрисовка всех спрайтов
+            for sprite in self.all_sprites:
+                pos = self.camera.apply(sprite)
+                screen.blit(sprite.image, pos.topleft)
+
+            # Отрисовка интерфейса (не зависит от камеры)
             self.draw_inventory_and_hotbar(screen)
 
+            # Отрисовка FPS (для отладки)
+            fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
+            screen.blit(fps_text, (10, 10))
+
+        # Обновление экрана
         pygame.display.flip()
 
     def draw_inventory_and_hotbar(self, screen):
@@ -399,36 +432,43 @@ class GameManager:
                         screen.blit(item_surface, (slot_x + 10, slot_y + 10))
 
     def render_map(self, screen):
+        """Отрисовка карты"""
         if not self.map_loaded:
             return
 
-        cam_x, cam_y = self.camera.camera.topleft
-        view_width, view_height = self.camera.camera.size
+        # Получаем смещение камеры
+        camera_offset = self.camera.offset
 
+        # Размер тайла
+        tile_width = self.tmx_data.tilewidth
+        tile_height = self.tmx_data.tileheight
+
+        # Вычисляем видимую область в тайлах
+        start_x = int(camera_offset.x) // tile_width
+        end_x = start_x + (screen.get_width() // tile_width) + 2
+        start_y = int(camera_offset.y) // tile_height
+        end_y = start_y + (screen.get_height() // tile_height) + 2
+
+        # Ограничиваем индексы границами карты
+        start_x = max(0, start_x)
+        start_y = max(0, start_y)
+        end_x = min(self.tmx_data.width, end_x)
+        end_y = min(self.tmx_data.height, end_y)
+
+        # Отрисовка видимых тайлов
         for layer in self.tmx_data.visible_layers:
             if hasattr(layer, 'data'):
-                tile_w, tile_h = self.tmx_data.tilewidth, self.tmx_data.tileheight
-                start_x = max(0, cam_x // tile_w)
-                start_y = max(0, cam_y // tile_h)
-                end_x = min(self.tmx_data.width, (cam_x + view_width) // tile_w + 1)
-                end_y = min(self.tmx_data.height, (cam_y + view_height) // tile_h + 1)
-
-                for y in range(int(start_y), int(end_y)):
-                    for x in range(int(start_x), int(end_x)):
-                        try:
-                            gid = layer.data[y][x]
-                            if gid:
-                                tile = self.tmx_data.get_tile_image_by_gid(gid)
-                                if tile:
-                                    pos_x, pos_y = self.camera.apply_point(x * tile_w, y * tile_h)
-                                    screen.blit(tile, (pos_x, pos_y))
-                        except IndexError:
-                            pass
-            elif hasattr(layer, 'objects'):
-                for obj in layer:
-                    if hasattr(obj, 'image') and obj.image:
-                        pos_x, pos_y = self.camera.apply_point(obj.x, obj.y)
-                        screen.blit(obj.image, (pos_x, pos_y))
+                for y in range(start_y, end_y):
+                    for x in range(start_x, end_x):
+                        tile = layer.data[y][x]
+                        if tile:
+                            # Получаем изображение тайла
+                            tile_image = self.tmx_data.get_tile_image_by_gid(tile)
+                            if tile_image:
+                                # Вычисляем позицию на экране
+                                screen_x = x * tile_width - int(camera_offset.x)
+                                screen_y = y * tile_height - int(camera_offset.y)
+                                screen.blit(tile_image, (screen_x, screen_y))
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
