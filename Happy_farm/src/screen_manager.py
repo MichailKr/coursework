@@ -1,6 +1,6 @@
 import pygame
-from Happy_farm.src.settings import WINDOW_SIZE
-from Happy_farm.src.settings import FULLSCREEN_SIZE
+from src.settings import WINDOW_SIZE
+from src.settings import FULLSCREEN_SIZE
 
 class ScreenManager:
     def __init__(self):
@@ -8,13 +8,13 @@ class ScreenManager:
         self.screen = pygame.display.set_mode(WINDOW_SIZE[self.current_mode])
         pygame.display.set_caption("Happy Farm")
 
-    def toggle_screen_mode(self, mode):
-        if mode != self.current_mode:
-            self.current_mode = mode
-            if mode == 'fullscreen':
-                self.screen = pygame.display.set_mode(WINDOW_SIZE[mode], pygame.FULLSCREEN)
-            else:
-                self.screen = pygame.display.set_mode(WINDOW_SIZE[mode])
+    def toggle_screen_mode(self):
+        if self.current_mode == 'windowed':
+            self.current_mode = 'fullscreen'
+            self.screen = pygame.display.set_mode(WINDOW_SIZE['fullscreen'], pygame.FULLSCREEN)
+        else:
+            self.current_mode = 'windowed'
+            self.screen = pygame.display.set_mode(WINDOW_SIZE['windowed'])
 
     def get_screen(self):
         return self.screen

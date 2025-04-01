@@ -1,5 +1,5 @@
 import pygame
-from Happy_farm.src.game_state import GameState
+from src.game_state import GameState
 
 
 class EventHandler:

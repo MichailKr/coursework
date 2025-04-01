@@ -1,4 +1,4 @@
-from Happy_farm.src.game_manager import GameManager
+from src.game_manager import GameManager
 
 def main():
     game = GameManager()

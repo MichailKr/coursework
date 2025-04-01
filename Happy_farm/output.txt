@@ -70,7 +70,7 @@ class Camera:
 ==================== event_handler.py ====================
 
 import pygame
-from Happy_farm.src.game_state import GameState
+from src.game_state import GameState
 
 
 class EventHandler:
@@ -202,12 +202,12 @@ class EventHandler:
 ==================== game_manager.py ====================
 
 import pygame
-from Happy_farm.src.game_state import GameState
-from Happy_farm.src.screen_manager import ScreenManager
-from Happy_farm.src.event_handler import EventHandler
-from Happy_farm.src.render_manager import RenderManager
-from Happy_farm.src.player import Player
-from Happy_farm.src.camera import Camera
+from src.game_state import GameState
+from src.screen_manager import ScreenManager
+from src.event_handler import EventHandler
+from src.render_manager import RenderManager
+from src.player import Player
+from src.camera import Camera
 import pytmx
 import os
 
@@ -548,7 +548,7 @@ class GameState(Enum):
 ==================== map_renderer.py ====================
 
 import pygame
-from Happy_farm.src.tilemap import TiledMap
+from src.tilemap import TiledMap
 
 
 class MapRenderer:
@@ -771,7 +771,7 @@ class Player(pygame.sprite.Sprite):
 ==================== render_manager.py ====================
 
 import pygame
-from Happy_farm.src.map_renderer import MapRenderer
+from src.map_renderer import MapRenderer
 
 class RenderManager:
     def __init__(self, screen_manager):
@@ -1073,8 +1073,8 @@ class ResourceLoader:
 ==================== screen_manager.py ====================
 
 import pygame
-from Happy_farm.src.settings import WINDOW_SIZE
-from Happy_farm.src.settings import FULLSCREEN_SIZE
+from src.settings import WINDOW_SIZE
+from src.settings import FULLSCREEN_SIZE
 
 class ScreenManager:
     def __init__(self):

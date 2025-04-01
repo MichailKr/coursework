@@ -1,5 +1,5 @@
 import pygame
-from Happy_farm.src.tilemap import TiledMap
+from src.tilemap import TiledMap
 
 
 class MapRenderer:

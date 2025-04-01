@@ -1,10 +1,11 @@
 import pygame
-from Happy_farm.src.game_state import GameState
-from Happy_farm.src.screen_manager import ScreenManager
-from Happy_farm.src.event_handler import EventHandler
-from Happy_farm.src.render_manager import RenderManager
-from Happy_farm.src.player import Player
-from Happy_farm.src.camera import Camera
+from src.game_state import GameState
+from src.screen_manager import ScreenManager
+from src.event_handler import EventHandler
+from src.render_manager import RenderManager
+from src.player import Player
+from src.camera import Camera
+from src.item import Tool
 import pytmx
 import os
 
@@ -47,11 +48,11 @@ class GameManager:
             'large': pygame.font.Font(None, 48)
         }
 
-        self.tools = {
-            'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
-            'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
-            'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
-        }
+        # self.tools = {
+        #     'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
+        #     'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
+        #     'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
+        # }
 
         self.inventory_open = False
         self.selected_item_index = 0
@@ -275,7 +276,7 @@ class GameManager:
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
-        self.screen_manager.toggle_screen_mode('fullscreen')
+        self.screen_manager.toggle_screen_mode()
 
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())

@@ -1,5 +1,5 @@
 import pygame
-from Happy_farm.src.map_renderer import MapRenderer
+from src.map_renderer import MapRenderer
 
 class RenderManager:
     def __init__(self, screen_manager):
