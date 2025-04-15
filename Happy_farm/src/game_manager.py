@@ -47,11 +47,11 @@ class GameManager:
             'large': pygame.font.Font(None, 48)
         }
 
-        self.tools = {
-            'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
-            'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
-            'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
-        }
+        #self.tools = {
+        #    'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
+        #    'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
+        #    'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
+        #}
 
         self.inventory_open = False
         self.selected_item_index = 0
