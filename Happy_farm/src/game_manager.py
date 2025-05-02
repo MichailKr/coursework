@@ -6,6 +6,7 @@ from src.render_manager import RenderManager
 from src.player import Player
 from src.camera import Camera
 from src.item import Tool
+from src.item import Item
 import pytmx
 import os
 
@@ -83,6 +84,23 @@ class GameManager:
             map_height = self.tmx_data.height * self.tmx_data.tileheight
             self.camera.set_map_size(map_width, map_height)
             print(f"Размеры карты для камеры установлены: {map_width}x{map_height}")
+
+            # Initialize inventory
+            self.dragged_item = None
+            self.hotbar_slots = [None] * 8
+            self.inventory_slots = [[None for _ in range(3)] for _ in range(8)]
+
+            # Load tool sprites and create items
+            self.tools = {
+                'hoe': Item('Мотыга', pygame.image.load('/sprites/tools_sprites/hoe.png'), 'hoe'),
+                'axe': Item('Топор', pygame.image.load('/sprites/tools_sprites/axe.png'), 'axe'),
+                'wateringcan': Item('Лейка', pygame.image.load('/sprites/tools_sprites/watering_can.png'), 'wateringcan')
+            }
+
+            # Add tools to hotbar initially
+            self.hotbar_slots[0] = self.tools['hoe']
+            self.hotbar_slots[1] = self.tools['axe']
+            self.hotbar_slots[2] = self.tools['wateringcan']
 
         self.init_game_objects()
 

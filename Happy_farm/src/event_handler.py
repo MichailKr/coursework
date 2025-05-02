@@ -125,3 +125,101 @@ class EventHandler:
         """Переключение полноэкранного режима"""
         self.game_manager.settings['fullscreen'] = not self.game_manager.settings['fullscreen']
         self.game_manager.toggle_fullscreen()
+
+    def handle_mouse_down_inventory(self, pos):
+        if self.game_manager.state == GameState.GAME:
+            # Check hotbar slots
+            for i, item in enumerate(self.game_manager.hotbar_slots):
+                slot_rect = self.get_hotbar_slot_rect(i)
+                if slot_rect.collidepoint(pos) and item:
+                    self.game_manager.dragged_item = item
+                    item.dragging = True
+                    item.original_pos = (i, None)  # (hotbar_index, None)
+                    return
+
+            # Check inventory slots if inventory is open
+            if self.game_manager.inventory_open:
+                for row in range(8):
+                    for col in range(3):
+                        slot_rect = self.get_inventory_slot_rect(row, col)
+                        if slot_rect.collidepoint(pos):
+                            item = self.game_manager.inventory_slots[row][col]
+                            if item:
+                                self.game_manager.dragged_item = item
+                                item.dragging = True
+                                item.original_pos = (row, col)
+                                return
+
+    def handle_mouse_up_inventory(self, pos):
+        if self.game_manager.dragged_item:
+            item = self.game_manager.dragged_item
+
+            # Check hotbar slots
+            for i in range(len(self.game_manager.hotbar_slots)):
+                slot_rect = self.get_hotbar_slot_rect(i)
+                if slot_rect.collidepoint(pos):
+                    self.place_item_in_hotbar(item, i)
+                    return
+
+            # Check inventory slots
+            if self.game_manager.inventory_open:
+                for row in range(8):
+                    for col in range(3):
+                        slot_rect = self.get_inventory_slot_rect(row, col)
+                        if slot_rect.collidepoint(pos):
+                            self.place_item_in_inventory(item, row, col)
+                            return
+
+            # If dropped outside, return to original position
+            if item.original_pos[1] is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[item.original_pos[0]] = item
+            else:  # Was in inventory
+                row, col = item.original_pos
+                self.game_manager.inventory_slots[row][col] = item
+
+            item.dragging = False
+            self.game_manager.dragged_item = None
+
+    def get_hotbar_slot_rect(self, index):
+        screen = self.game_manager.screen_manager.get_screen()
+        slot_size = 60
+        start_x = (screen.get_width() - (8 * slot_size)) // 2
+        return pygame.Rect(start_x + (index * slot_size), screen.get_height() - 80, slot_size, slot_size)
+
+    def get_inventory_slot_rect(self, row, col):
+        screen = self.game_manager.screen_manager.get_screen()
+        slot_size = 70
+        start_x = (screen.get_width() - (3 * slot_size)) // 2
+        start_y = (screen.get_height() - (8 * slot_size)) // 2
+        return pygame.Rect(start_x + (col * slot_size), start_y + (row * slot_size), slot_size, slot_size)
+
+    def place_item_in_hotbar(self, item, slot_index):
+        # Swap items if slot is occupied
+        current_item = self.game_manager.hotbar_slots[slot_index]
+        self.game_manager.hotbar_slots[slot_index] = item
+
+        if current_item:
+            row, col = item.original_pos
+            if col is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[row] = current_item
+            else:  # Was in inventory
+                self.game_manager.inventory_slots[row][col] = current_item
+
+        item.dragging = False
+        self.game_manager.dragged_item = None
+
+    def place_item_in_inventory(self, item, row, col):
+        # Swap items if slot is occupied
+        current_item = self.game_manager.inventory_slots[row][col]
+        self.game_manager.inventory_slots[row][col] = item
+
+        if current_item:
+            old_row, old_col = item.original_pos
+            if old_col is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[old_row] = current_item
+            else:  # Was in inventory
+                self.game_manager.inventory_slots[old_row][old_col] = current_item
+
+        item.dragging = False
+        self.game_manager.dragged_item = None
+
