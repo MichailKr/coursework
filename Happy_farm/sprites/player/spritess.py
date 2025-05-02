@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 
 
-def split_spritesheet(filename, output_folder='sprites'):
+def split_spritesheet(filename, output_folder='tools_sprites'):
     # Создаем папку для сохранения спрайтов, если ее нет
     import os
     if not os.path.exists(output_folder):
@@ -20,8 +20,8 @@ def split_spritesheet(filename, output_folder='sprites'):
         alpha = np.ones((img.height, img.width), dtype=np.uint8) * 255
 
     # Подсчитываем количество строк и столбцов
-    rows = 4  # В вашем случае 4 строки
-    cols = 4  # В вашем случае 4 столбца
+    rows = 6  # В вашем случае 6 строки
+    cols = 6  # В вашем случае 6 столбца
 
     sprite_width = img.width // cols
     sprite_height = img.height // rows
@@ -45,4 +45,4 @@ def split_spritesheet(filename, output_folder='sprites'):
 
 
 # Используем функцию
-split_spritesheet('character_move_sprite_sheet.png')
+split_spritesheet('Tools.png')
