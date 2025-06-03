@@ -4333,4 +4333,10 @@
 </data>
   </layer>
  </group>
+ <objectgroup id="6" name="spawn">
+  <object id="1" name="player_spawn" x="1000" y="1000">
+   <point/>
+  </object>
+ </objectgroup>
+</map>
 </map>
