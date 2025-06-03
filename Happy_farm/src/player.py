@@ -1,4 +1,5 @@
 import pygame
+import pytmx
 import os
 
 
@@ -29,6 +30,10 @@ class Player(pygame.sprite.Sprite):
         self.image = self.animations[self.direction][0]
         self.rect = self.image.get_rect(topleft=(x, y))
 
+        # Создаем отдельный прямоугольник для коллизий
+        self.collision_rect = pygame.Rect(0, 0, 16, 16)  # Размер коллизии (16x16)
+        self.update_collision_rect()  # Обновляем позицию коллизии
+
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")
 
     def load_animations(self):
@@ -37,14 +42,14 @@ class Player(pygame.sprite.Sprite):
             "down": [],
             "left": [],
             "right": [],
-            "up": []
+            "up": [],
         }
 
         # Проверяем наличие папки со спрайтами
         if not os.path.exists(self.sprite_path):
             print(f"Ошибка: Путь {self.sprite_path} не существует.")
             # Создаем заглушку - зеленый квадрат
-            dummy = pygame.Surface((32, 32))
+            dummy = pygame.Surface((16, 16))
             dummy.fill((0, 255, 0))
             for direction in animations:
                 animations[direction] = [dummy]
@@ -52,17 +57,11 @@ class Player(pygame.sprite.Sprite):
 
         try:
             # Сопоставляем индексы с направлениями
-            # Предполагается, что спрайты названы как sprite_0.png, sprite_1.png и т.д.
-            # и организованы в таком порядке: первая строка - вниз, вторая - влево,
-            # третья - вправо, четвертая - вверх
-
-            # Создаем словарь для сопоставления направлений со спрайтами
-            # Каждое направление имеет 4 кадра (по количеству столбцов)
             directions_map = {
                 "down": [0, 1, 2, 3],  # первая строка (индексы 0-3)
                 "left": [8, 9, 10, 11],  # вторая строка (индексы 4-7)
                 "right": [12, 13, 14, 15],  # третья строка (индексы 8-11)
-                "up": [4, 5, 6, 7]  # четвертая строка (индексы 12-15)
+                "up": [4, 5, 6, 7],  # четвертая строка (индексы 12-15)
             }
 
             # Загружаем все спрайты
@@ -76,7 +75,7 @@ class Player(pygame.sprite.Sprite):
                     sprites.append(sprite)
                 else:
                     print(f"Предупреждение: Файл {img_path} не найден.")
-                    dummy = pygame.Surface((32, 32))
+                    dummy = pygame.Surface((16, 16))
                     dummy.fill((255, 0, 255))  # Фиолетовый для обозначения отсутствия
                     sprites.append(dummy)
 
@@ -134,8 +133,7 @@ class Player(pygame.sprite.Sprite):
         # Обновляем X
         self.x += dx
         self.rect.x = int(self.x)
-
-        # Проверяем коллизии по X
+        self.update_collision_rect()  # Обновляем позицию прямоугольника коллизии
         if self.check_collision():
             self.x = prev_x
             self.rect.x = int(prev_x)
@@ -143,17 +141,15 @@ class Player(pygame.sprite.Sprite):
         # Обновляем Y
         self.y += dy
         self.rect.y = int(self.y)
-
-        # Проверяем коллизии по Y
+        self.update_collision_rect()  # Обновляем позицию прямоугольника коллизии
         if self.check_collision():
             self.y = prev_y
             self.rect.y = int(prev_y)
 
         # Ограничение движения игрока границами карты
-        if hasattr(self.game, 'tmx_data') and self.game.map_loaded:
+        if hasattr(self.game, "tmx_data") and self.game.map_loaded:
             map_width = self.game.tmx_data.width * self.game.tmx_data.tilewidth
             map_height = self.game.tmx_data.height * self.game.tmx_data.tileheight
-
             self.x = max(0, min(self.x, map_width - self.rect.width))
             self.y = max(0, min(self.y, map_height - self.rect.height))
             self.rect.x = int(self.x)
@@ -161,6 +157,10 @@ class Player(pygame.sprite.Sprite):
 
         # Обновление анимации
         self.update_animation(dt, was_moving)
+
+    def update_collision_rect(self):
+        """Обновляет позицию прямоугольника коллизии."""
+        self.collision_rect.center = self.rect.center
 
     def update_animation(self, dt, was_moving):
         """Обновление анимации игрока"""
@@ -185,7 +185,75 @@ class Player(pygame.sprite.Sprite):
         self.image = self.animations[self.direction][self.current_frame]
 
     def check_collision(self):
-        """Проверка коллизий игрока с объектами на карте"""
-        # Упрощенная проверка - возвращает False, если коллизий нет
-        # Здесь можно реализовать проверку с препятствиями на карте
+        """Проверка коллизий игрока с объектами на карте."""
+        if not hasattr(self.game, "tmx_data") or not self.game.map_loaded:
+            return False
+
+        for layer in self.game.tmx_data.layers:
+            if layer.name == "Коллизия лес" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
+            if layer.name == "Колилзия горок" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
+            if layer.name == "Коллизия река и Озеро" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
+            if layer.name == "Коллизия камней" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
+            if layer.name == "Дом" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
+            if layer.name == "Коллизия Мосты" and isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    if gid != 0:
+                        tile_rect = pygame.Rect(
+                            x * self.game.tmx_data.tilewidth,
+                            y * self.game.tmx_data.tileheight,
+                            self.game.tmx_data.tilewidth,
+                            self.game.tmx_data.tileheight,
+                        )
+                        if self.collision_rect.colliderect(tile_rect):
+                            return True
         return False
