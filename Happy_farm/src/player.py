@@ -223,17 +223,6 @@ class Player(pygame.sprite.Sprite):
                         )
                         if self.collision_rect.colliderect(tile_rect):
                             return True
-            if layer.name == "Коллизия камней" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
             if layer.name == "Дом" and isinstance(layer, pytmx.TiledTileLayer):
                 for x, y, gid in layer:
                     if gid != 0:
