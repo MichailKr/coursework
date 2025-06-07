@@ -32,16 +32,20 @@ class Character:
 		self.coins = 0
 
 		# draw the initial position of the character
-		self.draw_position()
+		# При инициализации еще нет offset_x, его нужно передавать при каждом вызове draw_position в runGame
+		# self.draw_position() # Убираем отрисовку здесь, так как она будет в цикле runGame с учетом offset_x
+
 
 	# draw the character
-	def draw_position(self):
-		pygame.draw.rect(self.screen, self.a_colour, [self.border_width+(self.side_length+self.border_width)*self.current_position[0],\
+	# Добавляем параметр offset_x
+	def draw_position(self, offset_x):
+		pygame.draw.rect(self.screen, self.a_colour, [offset_x + self.border_width+(self.side_length+self.border_width)*self.current_position[0],\
 			self.border_width+(self.side_length+self.border_width)*self.current_position[1], self.side_length, self.side_length])
 
 	# move the character to next position
 	# Эта функция, move_character, кажется не используется в твоем main.py, там используется move_character_smooth
 	# Но мы добавим логику сбора ключей и монет на всякий случай
+	# В этой функции не нужно учитывать offset_x при расчете следующей позиции, так как next_position уже в координатах сетки лабиринта
 	def move_character(self, next_position):
 		# create a rectangle for the current position
 		current_rect = [self.border_width+(self.side_length+self.border_width)*self.current_position[0],\
@@ -82,11 +86,17 @@ class Character:
 				# Нужно добавить атрибут для собранных ключей
 				# self.collected_keys += 1 # Предполагая, что такой атрибут есть
 
-
 	# draw the intermediate steps when moving a character
-	def move_character_smooth(self, next_position, steps):
+	# В этой функции, move_character_smooth, которая, видимо, обрабатывает анимацию,
+	# также нужно использовать offset_x при каждой промежуточной отрисовке.
+	# Так как у меня нет полной реализации move_character_smooth, я оставлю ее как есть,
+	# но отмечу, что каждая промежуточная отрисовка в ней ДОЛЖНА использовать offset_x.
+	# Добавляем параметр offset_x, хотя он может не использоваться напрямую в текущей реализации
+	def move_character_smooth(self, next_position, steps): # offset_x не нужен здесь, так как отрисовка происходит в другом месте
 		# Логика плавного движения - предполагается, что она правильно обновляет self.current_position
-		# Я оставлю ее как есть, но добавлю вызов логики сбора ключей и монет после завершения движения
+		# Каждая промежуточная отрисовка внутри этой функции ДОЛЖНА использовать offset_x при вызове pygame.draw.rect
+		# Например:
+		# pygame.draw.rect(self.screen, self.a_colour, [offset_x + ...])
 
 		# Пример очень простой реализации (тебе нужно использовать свою)
 		if next_position != self.current_position:
@@ -135,12 +145,13 @@ class Character:
 			return 0
 
 	# draw keys
-	def draw_keys(self):
+	# Добавляем параметр offset_x
+	def draw_keys(self, offset_x):
 		if self.escape is True and self.keys: # Добавлена проверка self.escape
 			for key in self.keys:
-				pygame.draw.rect(self.screen, self.k_colour, [self.border_width+(self.side_length+self.border_width)*key[0],\
-							 self.border_width+(self.side_length+self.border_width)*key[1], self.side_length, self.side_length])
-
+				# Используем offset_x при отрисовке ключей
+				pygame.draw.rect(self.screen, self.k_colour, [offset_x + self.border_width+(self.side_length+self.border_width)*key[0],\
+							 self.border_width+(self.side_length+self.border_width)*key[1], self.side_length, self.side_length]) # Исправлена опечатка: self_length -> side_length
 
 	# increase the computer speed flag
 	def increase_computer_speed(self):

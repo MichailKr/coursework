@@ -76,15 +76,16 @@ def displaySettingsSeleciton(screen, screen_size, choice, bg_colour, a_colour, n
 	# Обновляем индексы выбора
 	items = [
 		("Settings", na_colour, 60, screen_size[1]//6),
-		(grid_text, a_colour if choice == 0 else na_colour, 30, screen_size[1]*2//6),
-		(side_text, a_colour if choice == 1 else na_colour, 30, screen_size[1]*3//6),
-		(mode_text, a_colour if choice == 2 else na_colour, 30, screen_size[1]*4//6),
-		("Return", a_colour if choice == 3 else na_colour, 30, screen_size[1]*5//6)
+		# Используем BLACK для невыбранных пунктов в меню настроек
+		(grid_text, a_colour if choice == 0 else (0, 0, 0), 30, screen_size[1]*2//6), # BLACK = (0, 0, 0)
+		(side_text, a_colour if choice == 1 else (0, 0, 0), 30, screen_size[1]*3//6), # BLACK = (0, 0, 0)
+		(mode_text, a_colour if choice == 2 else (0, 0, 0), 30, screen_size[1]*4//6), # BLACK = (0, 0, 0)
+		("Return", a_colour if choice == 3 else (0, 0, 0), 30, screen_size[1]*5//6) # BLACK = (0, 0, 0)
 	]
 
 	for i, (text, color, size, y_pos) in enumerate(items):
 		# Передаем screen_size в displayMessage
-		displayMessage(text, color, screen, size, screen_size, y_pos, mode_text_rect if i == 3 else None)
+		displayMessage(text, color, screen, size, screen_size, y_pos, mode_text_rect if i == 3 else None) # Передаем обновленный цвет
 
 
 # settings function - enables user to choose size of the map
@@ -281,6 +282,7 @@ def display_leaderboard_screen(screen, font, leaderboard_data, sort_by='time', s
 
 	y_offset = 150
 	for i, entry in enumerate(sorted_data[:15]): # Отображаем топ-15
+		# Отображаем время с двумя знаками после запятой
 		score_text = font.render(
 			f"{i+1}. {entry.get('name', 'Player')} - Время: {entry.get('time', 0):.2f} сек, Монеты: {entry.get('coins', 0)}",
 			True, (255, 255, 255)
@@ -342,10 +344,11 @@ def endGame(mode, value): # Не принимаем screen и screen_size, та�
 
 	pygame.display.set_caption("Game Over")
 	screen.fill(WHITE)
-	# pygame.display.flip() # Не нужно здесь, вызывается в displayMessage
+	pygame.display.flip() # Добавляем явное обновление экрана после заливки
 
 	if mode == 0:
-		text = "Time: " + str(value) + " s"
+		# Для режима Solo, value - это время
+		text = f"Время: {value:.2f} сек" # Отображаем время с двумя знаками после запятой
 		displayMessage("Game Over", BLACK, screen, 50, screen_size, screen_size[1]//4)
 		displayMessage(text, BLACK, screen, 30, screen_size, screen_size[1]*2//4)
 		displayMessage("Press enter to exit to menu.", BLACK, screen, 20, screen_size,screen_size[1]*3//4)

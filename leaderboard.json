@@ -10,8 +10,18 @@
         "name": "Solo Player"
     },
     {
+        "time": 21.108534336090088,
+        "coins": 4,
+        "name": "Solo Player"
+    },
+    {
         "time": 33,
         "coins": 0,
+        "name": "Solo Player"
+    },
+    {
+        "time": 70.52315068244934,
+        "coins": 14,
         "name": "Solo Player"
     }
 ]
