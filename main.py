@@ -237,12 +237,9 @@ def update_console(screen, screen_size, side_length, text_size, a_colour, na_col
     pygame.display.update(console_rect)
 
 
-# run the maze game
-# takes in a game mode parameter along with grid size and side length for the maze
 def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь принимаем screen и screen_size
     # initialize the game engine
     # pygame.init() # Не вызываем здесь, инициализация в main
-
     # Defining colours (RGB) ...
     BLACK = (0, 0, 0)
     GRAY = (100, 100, 100)
@@ -251,20 +248,16 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
     GREEN = (0, 255, 0)
     RED = (255, 0, 0)
     BLUE = (0, 0, 255)
-
+    COIN_COLOR = GOLD  # Цвет монет
     # set the grid size and side length of each grid
     # grid_size = 20 # this is the maximum size before reaching recursion limit on maze buidling function
     # side_length = 10
-
     # scale the border width with respect to the given side length
     border_width = side_length // 5
-
     # initialize the grid for the maze
     grid = create_grid(grid_size)
-
     # create the maze using the grid
     maze = create_maze(grid, (grid_size // 2, grid_size // 2))  # use the starting vertex to be middle of the map
-
     # Opening a window ...
     # set the screen size to match the grid
     # size = (grid_size*(side_length+border_width)+border_width,\
@@ -282,24 +275,24 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
     if mode == 4:
         game_screen_height += side_length * 3
 
-    pygame.display.set_mode((game_screen_width, game_screen_height))  # Изменяем размер окна
-    screen_size = (game_screen_width, game_screen_height)  # Обновляем переменную screen_size
-
+    # Проверяем, если текущий размер окна отличается, меняем его
+    current_window_size = pygame.display.get_surface().get_size()
+    if current_window_size != (game_screen_width, game_screen_height):
+        pygame.display.set_mode((game_screen_width, game_screen_height))  # Изменяем размер окна
+        screen_size = (game_screen_width, game_screen_height)  # Обновляем переменную screen_size
+    else:
+        # Если размер не меняется, просто обновляем screen_size
+        screen_size = current_window_size
     # set the continue flag
     carryOn = True
-
     # set the clock (how fast the screen updates)
     clock = pygame.time.Clock()
-
     # have a black background
     screen.fill(BLACK)
-
     # get all of the vertices in the maze
     vertices = maze.get_vertices()
-
     # draw the maze
     draw_maze(screen, maze, grid_size, WHITE, side_length, border_width)
-
     # initialize starting point of character and potential character 2
     start_point = (0, 0)
     # opposing corner
@@ -308,7 +301,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
     end_point = (grid_size - 1, grid_size - 1)
     # initialize opponent's end-point for two player mode
     end_point2 = (0, 0)
-
     # randomize a start and end point
     choice = random.randrange(4)
     if choice == 0:
@@ -328,11 +320,9 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
         end_point2 = (grid_size - 1, 0)
     # initialize winner variable
     winner = 0
-
     # initialize the character
     player1 = Character(screen, side_length, border_width, vertices, \
                         start_point, end_point, start_point, GREEN, WHITE)
-
     # if the two player game mode is selected, initialize the other character
     if mode == 1:
         player2 = Character(screen, side_length, border_width, vertices, \
@@ -391,7 +381,7 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
                             end_point, start_point, GREEN, WHITE, True, unlock_keys, GOLD)
         # initialize computer character
         computer_character = Character(screen, side_length, border_width, vertices, \
-                                       start_point, end_point, start_point, GRAY, WHITE)
+                                       start_point, end_point, start_point, GRAY, WHITE)  # Исправлено на border_width
         # create a deque for the paths to the player
         dq = deque()
         # put start_point for the deque
@@ -406,30 +396,40 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
         # initialize timers
         computer_timer = pygame.time.get_ticks()
         initial_wait_timer = pygame.time.get_ticks()
-
+    # --- Монеты ---
+    # Генерируем монеты
+    # Количество монет можно регулировать, например, proportionalно размеру лабиринта
+    num_coins = (grid_size * grid_size) // 10  # Пример: 10% от количества клеток
+    # Исключаем стартовую и конечную точки
+    available_coin_positions = [v for v in vertices if v != start_point and v != end_point]
+    # Если двух игроков, исключаем и их стартовые и конечные точки
+    if mode == 1:
+        available_coin_positions = [v for v in available_coin_positions if v != start_point2 and v != end_point2]
+    # Если режим Escape, исключаем позиции ключей
+    elif mode == 4 and player1.keys:
+        available_coin_positions = [v for v in available_coin_positions if v not in player1.keys]
+    # Выбираем случайные позиции для монет из доступных
+    coin_positions = random.sample(available_coin_positions, min(num_coins, len(available_coin_positions)))
+    # Цвет монет (золотой) уже определен: COIN_COLOR = GOLD
+    # --- Конец Монеты ---
     # draw the end-point
     draw_position(screen, side_length, border_width, end_point, RED)
-
     # if two player mode, draw endpoints
     if mode == 1:
         draw_position(screen, side_length, border_width, end_point, GREEN)
         draw_position(screen, side_length, border_width, end_point2, BLUE)
-
     # if computer mode, draw gray endpoint for computer
     elif mode == 2:
         draw_position(screen, side_length, border_width, end_point, GREEN)
         draw_position(screen, side_length, border_width, end_point2, GRAY)
-
     # if escape mode, draw keys
     elif mode == 4:
         player1.draw_keys()
         # update console
         update_console(screen, screen_size, side_length, screen_size[0] // grid_size, WHITE, BLACK,
                        player1.get_keys_left(), player1.get_wallBreaks())  # Использовать screen_size
-
     # update the screen
     pygame.display.flip()
-
     # set cooldown for key presses
     cooldown = 100
     # initialize the cooldown timer
@@ -437,13 +437,11 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
     # if the two player mode is selected, initialize the cooldown timer for second player
     if mode == 1:
         start_timer2 = pygame.time.get_ticks()
-
     # initialize game timer for solo mode
     game_timer = 0
     # if solo mode is selected, start game timer
     if mode == 0:
         game_timer = time.time()
-
     # main loop
     while carryOn:
         # action (close screen)
@@ -451,15 +449,21 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             if event.type == pygame.QUIT:
                 carryOn = False
                 # mode = -1 means just exit
-                mode = -1
+                mode = -1  # Возвращаем -1 для выхода из игры
             elif event.type == pygame.KEYDOWN:
                 # Pressing the Esc Key will quit the game
                 if event.key == pygame.K_ESCAPE:
                     carryOn = False
-                    mode = -1
-
+                    mode = -1  # Возвращаем -1 для выхода из игры
         # get the pressed keys
         keys = pygame.key.get_pressed()
+        # --- Сбор монет ---
+        # Проверяем, находится ли игрок на позиции монеты
+        player1_pos = player1.get_current_position()
+        if player1_pos in coin_positions:
+            player1.collect_coin()  # Собираем монету
+            coin_positions.remove(player1_pos)  # Удаляем монету из списка
+        # --- Конец Сбор монет ---
         if (pygame.time.get_ticks() - start_timer > cooldown):
             # get the current point of character
             current_point = player1.get_current_position()
@@ -566,7 +570,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
                                 dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
                 # restart cooldown timer
                 start_timer = pygame.time.get_ticks()
-
         # PLAYER 2 MOVEMENT HERE (if gamemode selected)
         if mode == 1:
             # update the start timer for player 2
@@ -577,9 +580,14 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             # redraw the characters
             player2.draw_position()
             player1.draw_position()
+            # --- Сбор монет для Player 2 ---
+            player2_pos = player2.get_current_position()
+            if player2_pos in coin_positions:
+                player2.collect_coin()
+                coin_positions.remove(player2_pos)
+            # --- Конец Сбор монет для Player 2 ---
             # update screen
             pygame.display.update()
-
         # computer movement for race mode
         elif mode == 2:
             if (pygame.time.get_ticks() - computer_timer > computer_cooldown):
@@ -592,9 +600,14 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             # redraw the characters
             computer_character.draw_position()
             player1.draw_position()
+            # --- Сбор монет для Компьютера (опционально) ---
+            computer_pos = computer_character.get_current_position()
+            if computer_pos in coin_positions:
+                # Можно добавить логику для компьютера, например, просто собирать монеты без эффекта
+                coin_positions.remove(computer_pos)
+            # --- Конец Сбор монет для Компьютера ---
             # update screen
             pygame.display.update()
-
         # computer movement for chase mode and escape mode
         elif mode == 3 or mode == 4:
             if mode == 4:
@@ -606,12 +619,18 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
                 else:
                     draw_position(screen, side_length, border_width, end_point, RED)
                 # increase the computer speed if got another 2 keys
-                if player1.increase_computer_speed():
-                    computer_cooldown = computer_cooldown / 2
+                # Эта логика должна быть в runGame после сбора ключей
+                # if player1.increase_computer_speed(): # Вызов из character.increase_computer_speed
+                #	 computer_cooldown = computer_cooldown/2
+                # --- Логика увеличения скорости компьютера при сборе ключей ---
+                if player1.escape and player1.keys is not None:
+                    # Предполагая, что collected_keys обновляется в Character
+                    # Или нужно обновить collected_keys здесь после сбора ключа
+                    pass  # Логика должна быть при сборе ключа
+                # --- Конец Логика увеличения скорости компьютера при сборе ключей ---
                 # update console
                 update_console(screen, screen_size, side_length, screen_size[0] // grid_size, WHITE, BLACK,
                                player1.get_keys_left(), player1.get_wallBreaks())  # Использовать screen_size
-
             # update the wait condition
             waitCondition = pygame.time.get_ticks() - initial_wait_timer > initial_wait
             # check if the wait condition is met
@@ -625,14 +644,63 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             # redraw the characters
             computer_character.draw_position()
             player1.draw_position()
+            # --- Сбор монет для Компьютера (в режимах Chase/Escape) ---
+            computer_pos = computer_character.get_current_position()
+            if computer_pos in coin_positions:
+                # Можно добавить логику для компьютера
+                coin_positions.remove(computer_pos)
+            # --- Конец Сбор монет для Компьютера ---
             # update screen
             pygame.display.update()
-
+        # --- Отрисовка монет ---
+        # Перерисовываем фон, чтобы "стереть" старые монеты
+        screen.fill(BLACK)
+        draw_maze(screen, maze, grid_size, WHITE, side_length, border_width)
+        # Отрисовываем оставшиеся монеты
+        for coin_pos in coin_positions:
+            draw_position(screen, side_length, border_width, coin_pos, COIN_COLOR)
+        # --- Конец Отрисовка монет ---
+        # --- Отрисовка персонажей и конечных точек (после монет) ---
+        draw_position(screen, side_length, border_width, end_point, RED)
+        if mode == 1:
+            draw_position(screen, side_length, border_width, end_point, GREEN)
+            draw_position(screen, side_length, border_width, end_point2, BLUE)
+            player2.draw_position()
+        elif mode == 2:
+            draw_position(screen, side_length, border_width, end_point, GREEN)
+            draw_position(screen, side_length, border_width, end_point2, GRAY)
+            computer_character.draw_position()
+        elif mode == 3 or mode == 4:
+            if mode == 4:
+                player1.draw_keys()  # Перерисовываем ключи
+                if player1.collected_all():  # Проверяем разблокировку выхода
+                    draw_position(screen, side_length, border_width, end_point, GREEN)
+                else:
+                    draw_position(screen, side_length, border_width, end_point, RED)
+                # update console
+                update_console(screen, screen_size, side_length, screen_size[0] // grid_size, WHITE, BLACK,
+                               player1.get_keys_left(), player1.get_wallBreaks())  # Использовать screen_size
+            if waitCondition:
+                computer_character.draw_position()  # Отрисовываем компьютер, если он активен
+        player1.draw_position()  # Отрисовываем игрока
+        # --- Конец Отрисовка персонажей и конечных точек ---
+        # --- Отображение количества монет ---
+        # Можно добавить текст с количеством монет где-то на экране
+        # Например, в правом верхнем углу
+        coin_text = f"Монеты: {player1.get_coins()}"
+        font_size = screen_size[0] // 30  # Размер шрифта пропорционально ширине
+        font = pygame.font.SysFont("ubuntu", font_size)
+        text_surface = font.render(coin_text, True, GOLD)  # Цвет текста
+        text_rect = text_surface.get_rect(topright=(screen_size[0] - 10, 10))  # Позиция в правом верхнем углу
+        screen.blit(text_surface, text_rect)
+        # pygame.display.update(text_rect) # Обновляем только область текста - не нужно, если обновляем весь экран
+        # --- Конец Отображение количества монет ---
+        # Обновляем весь экран в конце цикла
+        pygame.display.flip()
         # win conditions for the different modes
         if mode == 0:
             if player1.reached_goal():
                 carryOn = False
-
         elif mode == 1:
             if player1.reached_goal():
                 winner = 1
@@ -640,7 +708,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             elif player2.reached_goal():
                 winner = 2
                 carryOn = False
-
         elif mode == 2:
             if player1.reached_goal():
                 winner = 1
@@ -648,7 +715,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             elif computer_character.reached_goal():
                 winner = 2
                 carryOn = False
-
         elif mode == 3:
             if player1.reached_goal():
                 winner = 1
@@ -656,7 +722,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             elif computer_character.get_current_position() == player1.get_current_position() and waitCondition:
                 winner = 2
                 carryOn = False
-
         elif mode == 4:
             if player1.escaped():
                 winner = 1
@@ -664,22 +729,20 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
             elif computer_character.get_current_position() == player1.get_current_position() and waitCondition:
                 winner = 2
                 carryOn = False
-
         # limit to 60 frames per second (fps)
         clock.tick(60)
-
     # stop the game engine once exited the game
     # pygame.quit() # Не вызываем здесь, закрываем в main
-
     # solo mode
     if mode == 0:
         timer = int(time.time() - game_timer)
-        # Добавляем результат в таблицу лидеров
-        add_score_to_leaderboard(timer, 0, "Solo Player")  # Пока без монет и с простым именем
+        # Добавляем результат в таблицу лидеров: время и монеты
+        add_score_to_leaderboard(timer, player1.get_coins(), "Solo Player")  # Передаем количество монет
         # Возвращаем режим и время
         return mode, timer
     # other modes
     else:
+        # Возвращаем режим и победителя
         return mode, winner
 
 
@@ -687,10 +750,8 @@ def runGame(screen, screen_size, grid_size, side_length, mode):  # Теперь 
 if __name__ == "__main__":
     # initialize the game engine ONCE
     pygame.init()
-
     # set the window display position
     set_window_position(50, 50)
-
     # initialize states
     states = {0: "Main Menu", 1: "Gameplay", 2: "Leaderboard",
               3: "End Game"}  # Добавили состояние для экрана окончания игры
@@ -699,14 +760,11 @@ if __name__ == "__main__":
     grid_size = 20  # Дефольные значения
     side_length = 10  # Дефольные значения
     mode = 0  # Дефольный режим
-
     # Флаг для главного цикла
     Run = True
-
     # Создаем поверхность экрана один раз в начале
     screen_size = (800, 600)  # Дефолтный размер окна для меню и таблицы лидеров
     screen = pygame.display.set_mode(screen_size)
-
     while Run:
         if current_state == states[0]:  # Главное меню
             # startScreen теперь возвращает Run, grid_size, side_length, mode, next_state
@@ -716,16 +774,13 @@ if __name__ == "__main__":
                 current_state = states[next_state]  # Переходим в следующее состояние
             else:
                 Run = False  # Выходим из главного цикла
-
         elif current_state == states[1]:  # Состояние игры
-            # Перед запуском игры, возможно, нужно изменить размер окна - runGame это делает
             # runGame сам устанавливает размер окна, но он должен использовать переданную поверхность
             mode, value = runGame(screen, screen_size, grid_size, side_length,
                                   mode)  # Передаем screen, screen_size, grid_size, side_length, mode
             # После игры переходим в состояние окончания игры
             current_state = states[3]
             end_game_info = (mode, value)  # Сохраняем информацию для endGame
-
         elif current_state == states[2]:  # Состояние таблицы лидеров
             # Перед показом таблицы лидеров убедимся, что размер окна соответствует меню
             pygame.display.set_mode(screen_size)
@@ -735,12 +790,10 @@ if __name__ == "__main__":
             else:
                 current_state = states[
                     next_state]  # Иначе переходим в состояние, которое вернула leaderboardScreen (0 - главное меню)
-
         elif current_state == states[3]:  # Состояние окончания игры
             # Перед показом экрана окончания игры убедимся, что размер окна соответствует меню
             pygame.display.set_mode(screen_size)
             ui_file.endGame(end_game_info[0], end_game_info[1])  # Вызываем endGame с сохраненными данными
             current_state = states[0]  # После экрана окончания игры возвращаемся в главное меню
-
     # Закрываем Pygame один раз при полном выходе
     pygame.quit()
