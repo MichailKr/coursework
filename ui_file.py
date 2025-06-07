@@ -4,6 +4,8 @@ User interface file
 
 import pygame
 import time
+# Импорт функций для таблицы лидеров
+from leaderboard import load_leaderboard
 
 # displays a horizontally-centred message to the screen
 def displayMessage(text, colour, screen, size, screen_size, y_pos, screen_update=None):
@@ -30,21 +32,37 @@ def displayMessage(text, colour, screen, size, screen_size, y_pos, screen_update
 # bg_colour: background colour, a_colout: active colour, na_colour: inactive colour
 def displayMenuSelection(screen, screen_size, choice, bg_colour, a_colour, na_colour):
 	screen.fill(bg_colour)
-	if choice == 0:
-		displayMessage("Yet Another Maze", na_colour, screen, 50, screen_size, screen_size[1]//5)
-		displayMessage("Start Game", a_colour, screen, 30, screen_size, screen_size[1]*2//5)
-		displayMessage("Settings", na_colour, screen, 30, screen_size, screen_size[1]*3//5)
-		displayMessage("Exit", na_colour, screen, 30, screen_size, screen_size[1]*4//5)
-	elif choice == 1:
-		displayMessage("Yet Another Maze", na_colour, screen, 50, screen_size, screen_size[1]//5)
-		displayMessage("Start Game", na_colour, screen, 30, screen_size, screen_size[1]*2//5)
-		displayMessage("Settings", a_colour, screen, 30, screen_size, screen_size[1]*3//5)
-		displayMessage("Exit", na_colour, screen, 30, screen_size, screen_size[1]*4//5)
-	elif choice == 2:
-		displayMessage("Yet Another Maze", na_colour, screen, 50, screen_size, screen_size[1]//5)
-		displayMessage("Start Game", na_colour, screen, 30, screen_size, screen_size[1]*2//5)
-		displayMessage("Settings", na_colour, screen, 30, screen_size, screen_size[1]*3//5)
-		displayMessage("Exit", a_colour, screen, 30, screen_size, screen_size[1]*4//5)
+	# Обновляем пункты меню, добавив "Таблица лидеров"
+	menu_items = ["Yet Another Maze", "Start Game", "Settings", "Таблица лидеров", "Exit"]
+
+	# Рассчитываем вертикальный шаг между пунктами
+	# Учитываем, что первый пункт - это заголовок и он не выбирается
+	selectable_items_count = len(menu_items) - 1
+	if selectable_items_count > 0:
+		# Делим оставшееся пространство (высота экрана - отступ заголовка)
+		# на количество выбираемых пунктов + 1 (для отступа после последнего пункта)
+		item_spacing = (screen_size[1] - screen_size[1]//5) // (selectable_items_count + 1)
+	else:
+		item_spacing = 0 # Если нет выбираемых пунктов
+
+	y_positions = []
+	y_positions.append(screen_size[1]//5) # Позиция для заголовка
+
+	for i in range(selectable_items_count):
+		# Позиции выбираемых пунктов: отступ заголовка + (индекс пункта + 1) * шаг
+		y_positions.append(screen_size[1]//5 + item_spacing * (i + 1))
+
+
+	for i, item in enumerate(menu_items):
+		if i == 0: # Заголовок
+			# Передаем screen_size в displayMessage
+			displayMessage(item, na_colour, screen, 50, screen_size, y_positions[i])
+		else: # Выбираемые пункты
+			# Индекс выбора относится только к выбираемым пунктам (начиная с 0 для "Start Game")
+			color = a_colour if i - 1 == choice else na_colour
+			# Передаем screen_size в displayMessage
+			displayMessage(item, color, screen, 30, screen_size, y_positions[i])
+
 
 # display settings options
 # takes in additional grid size and side length parameters
@@ -53,199 +71,127 @@ def displaySettingsSeleciton(screen, screen_size, choice, bg_colour, a_colour, n
 	grid_text = "Grid size: " + str(grid_size)
 	side_text = "Side length: " + str(side_length)
 	# this is the position of the largest rectangle for mode text to update
-	mode_text_rect = (176,316,149,34)
-	if choice == 0:
-		displayMessage("Settings", na_colour, screen, 60, screen_size, screen_size[1]//6)
-		displayMessage(grid_text, a_colour, screen, 30, screen_size, screen_size[1]*2//6)
-		displayMessage(side_text, na_colour, screen, 30, screen_size, screen_size[1]*3//6)
-		displayMessage(mode_text, na_colour, screen, 30, screen_size, screen_size[1]*4//6, mode_text_rect)
-		displayMessage("Return", na_colour, screen, 30, screen_size, screen_size[1]*5//6)
-	elif choice == 1:
-		displayMessage("Settings", na_colour, screen, 60, screen_size, screen_size[1]//6)
-		displayMessage(grid_text, na_colour, screen, 30, screen_size, screen_size[1]*2//6)
-		displayMessage(side_text, a_colour, screen, 30, screen_size, screen_size[1]*3//6)
-		displayMessage(mode_text, na_colour, screen, 30, screen_size, screen_size[1]*4//6, mode_text_rect)
-		displayMessage("Return", na_colour, screen, 30, screen_size, screen_size[1]*5//6)
-	elif choice == 2:
-		displayMessage("Settings", na_colour, screen, 60, screen_size, screen_size[1]//6)
-		displayMessage(grid_text, na_colour, screen, 30, screen_size, screen_size[1]*2//6)
-		displayMessage(side_text, na_colour, screen, 30, screen_size, screen_size[1]*3//6)
-		displayMessage(mode_text, a_colour, screen, 30, screen_size, screen_size[1]*4//6, mode_text_rect)
-		displayMessage("Return", na_colour, screen, 30, screen_size, screen_size[1]*5//6)
-	elif choice == 3:
-		displayMessage("Settings", na_colour, screen, 60, screen_size, screen_size[1]//6)
-		displayMessage(grid_text, na_colour, screen, 30, screen_size, screen_size[1]*2//6)
-		displayMessage(side_text, na_colour, screen, 30, screen_size, screen_size[1]*3//6)
-		displayMessage(mode_text, na_colour, screen, 30, screen_size, screen_size[1]*4//6, mode_text_rect)
-		displayMessage("Return", a_colour, screen, 30, screen_size, screen_size[1]*5//6)
+	mode_text_rect = (176,316,149,34) # Возможно, эту координату тоже нужно пересчитать для нового размера экрана
+
+	# Обновляем индексы выбора
+	items = [
+		("Settings", na_colour, 60, screen_size[1]//6),
+		(grid_text, a_colour if choice == 0 else na_colour, 30, screen_size[1]*2//6),
+		(side_text, a_colour if choice == 1 else na_colour, 30, screen_size[1]*3//6),
+		(mode_text, a_colour if choice == 2 else na_colour, 30, screen_size[1]*4//6),
+		("Return", a_colour if choice == 3 else na_colour, 30, screen_size[1]*5//6)
+	]
+
+	for i, (text, color, size, y_pos) in enumerate(items):
+		# Передаем screen_size в displayMessage
+		displayMessage(text, color, screen, size, screen_size, y_pos, mode_text_rect if i == 3 else None)
+
 
 # settings function - enables user to choose size of the map
-def settingsMenu(screen, screen_size, bg_colour, a_colour, na_colour, cooldown, start_timer, g_size, s_length):
-
-	options = {0:"Grid Size", 1:"Side Length", 2:"Return", 3:"Mode"}
+def settingsMenu(screen, screen_size, bg_colour, a_colour, na_colour, cooldown, start_timer, g_size, s_length): # Теперь принимаем screen и screen_size
+	options = {0:"Grid Size", 1:"Side Length", 2:"Mode", 3:"Return"} # Обновили опции
 	modes = {0:"Solo", 1:"Two Player", 2:"Race", 3:"Chase", 4:"Escape"}
 	current_mode = 0
-	current_selection = options[0]
-
+	current_selection_index = 0 # Используем индекс для выбора
 	grid_size = g_size
 	side_length = s_length
 
 	pygame.display.set_caption("Settings")
-
 	screen.fill(bg_colour)
-
 	pygame.display.flip()
 
-	displaySettingsSeleciton(screen, screen_size, 0, bg_colour, a_colour, na_colour,\
+	displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
 							 grid_size, side_length, modes[current_mode])
 
 	carryOn = True
-
 	while carryOn:
 		# action (close screen)
 		for event in pygame.event.get():# user did something
 			if event.type == pygame.QUIT:
 				carryOn = False
-				Run = False
+				# Здесь нет Run = False, так как эта функция вызывается из startScreen
+
 
 		# get pressed keys
 		keys = pygame.key.get_pressed()
 
 		# if the cooldown timer is reached
 		if (pygame.time.get_ticks() - start_timer > cooldown):
-			if current_selection == options[0]:
-				# if user pressed down arrow key
-				if keys[pygame.K_DOWN]:
-					# display selection
-					displaySettingsSeleciton(screen, screen_size, 1, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[1]
-					# restart cooldown timer
-					start_timer = pygame.time.get_ticks()
-				# decrease the grid size by 1
-				if keys[pygame.K_LEFT]:
-					grid_size -= 1
-					if grid_size < 10:
-						grid_size = 10
-					displaySettingsSeleciton(screen, screen_size, 0, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-				# increase the grid size by 1
-				if keys[pygame.K_RIGHT]:
-					grid_size += 1
-					if grid_size > 35:
-						grid_size = 35
-					displaySettingsSeleciton(screen, screen_size, 0, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-			elif current_selection == options[1]:
-				# if user pressed down arrow key
-				if keys[pygame.K_DOWN]:
-					# display selection
-					displaySettingsSeleciton(screen, screen_size, 2, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[2]
-					# restart cooldown timer
-					start_timer = pygame.time.get_ticks()
-				# if user pressed up arrow key
-				if keys[pygame.K_UP]:
-					displaySettingsSeleciton(screen, screen_size, 0, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[0]
-					start_timer = pygame.time.get_ticks()
-				# decrease the grid size by 1
-				if keys[pygame.K_LEFT]:
-					side_length -= 1
-					if side_length < 10:
-						side_length = 10
-					displaySettingsSeleciton(screen, screen_size, 1, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-				# increase the grid size by 1
-				if keys[pygame.K_RIGHT]:
-					side_length += 1
-					if side_length > 15:
-						side_length = 15
-					displaySettingsSeleciton(screen, screen_size, 1, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-			elif current_selection == options[2]:
-				if keys[pygame.K_DOWN]:
-					displaySettingsSeleciton(screen, screen_size, 3, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[3]
-					start_timer = pygame.time.get_ticks()
-				if keys[pygame.K_UP]:
-					displaySettingsSeleciton(screen, screen_size, 1, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[1]
-					start_timer = pygame.time.get_ticks()
-				# mode selection
-				if keys[pygame.K_LEFT]:
-					current_mode -= 1
-					if current_mode < 0:
-						current_mode = 0
-					displaySettingsSeleciton(screen, screen_size, 2, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-				if keys[pygame.K_RIGHT]:
-					current_mode += 1
-					if current_mode > 4:
-						current_mode = 4
-					displaySettingsSeleciton(screen, screen_size, 2, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					start_timer = pygame.time.get_ticks()
-			elif current_selection == options[3]:
-				# if user pressed up arrow key
-				if keys[pygame.K_UP]:
-					# display selection 1
-					displaySettingsSeleciton(screen, screen_size, 2, bg_colour, a_colour, na_colour,\
-											 grid_size, side_length, modes[current_mode])
-					current_selection = options[2]
-					start_timer = pygame.time.get_ticks()
-				# press enter key to select this option
-				if keys[pygame.K_RETURN]:
-					carryOn = False
+			if keys[pygame.K_DOWN]:
+				current_selection_index = (current_selection_index + 1) % len(options)
+				displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
+										 grid_size, side_length, modes[current_mode])
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_UP]:
+				current_selection_index = (current_selection_index - 1) % len(options)
+				displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
+										 grid_size, side_length, modes[current_mode])
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_LEFT] and current_selection_index in [0, 1, 2]: # Регулирование только для размера, длины и режима
+				if current_selection_index == 0:
+					grid_size = max(10, grid_size - 1)
+				elif current_selection_index == 1:
+					side_length = max(10, side_length - 1)
+				elif current_selection_index == 2:
+					current_mode = max(0, current_mode - 1)
+				displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
+										 grid_size, side_length, modes[current_mode])
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_RIGHT] and current_selection_index in [0, 1, 2]:
+				if current_selection_index == 0:
+					grid_size = min(35, grid_size + 1)
+				elif current_selection_index == 1:
+					side_length = min(15, side_length + 1)
+				elif current_selection_index == 2:
+					current_mode = min(4, current_mode + 1)
+				displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
+										 grid_size, side_length, modes[current_mode])
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_RETURN] and current_selection_index == 3: # Выход при выборе "Return"
+				carryOn = False
+
 
 	# reset the caption
 	pygame.display.set_caption("Main Menu")
-
-	# return selected grid size and side length
+	# return selected grid size, side length и mode
 	return grid_size, side_length, current_mode
 
 # start screen function
-def startScreen():
-	pygame.init()
-
-	# default maze settings
-	grid_size = 20
-	side_length = 10
+def startScreen(screen, screen_size): # Теперь принимаем screen и screen_size
+	# pygame.init() # Не вызываем здесь, инициализация в main
+	# default maze settings - эти значения теперь задаются в main
+	# grid_size = 20 # Удаляем инициализацию
+	# side_length = 10 # Удаляем инициализацию
+	# mode = 0 # Удаляем инициализацию
 
 	# Define colours
 	BLACK = (0,0,0)
 	WHITE = (255,255,255)
 	GOLD = (249,166,2)
-
-	screen_size = (500,500)
-	screen = pygame.display.set_mode(screen_size)
+	# screen_size = (800,600) # Размер окна задается в main и передается сюда
+	# screen = pygame.display.set_mode(screen_size) # Не создаем новое окно, используем переданное
 	pygame.display.set_caption("Main Menu")
 	screen.fill(WHITE)
-
 	pygame.display.flip()
 
-	displayMenuSelection(screen, screen_size, 0, WHITE, GOLD, BLACK)
-
-	options = {0:"Start Game", 1:"Settings", 2:"Exit"}
-	current_selection = options[0]
+	options = {0:"Start Game", 1:"Settings", 2:"Таблица лидеров", 3:"Exit"} # Обновили опции меню
+	current_selection_index = 0 # Используем индекс
+	displayMenuSelection(screen, screen_size, current_selection_index, WHITE, GOLD, BLACK)
 
 	clock = pygame.time.Clock()
 
-	mode = 0
 
-	Run = True
-
-	carryOn = True
+	Run = True # Этот Run относится только к циклу этой функции
+	carryOn = True # Флаг для цикла этой функции
 	Settings = False
+	next_state = 1 # Состояние для перехода после меню (по умолчанию игра)
+
+    # Переменные для хранения выбора из настроек, инициализация перед циклом
+	# Эти значения будут обновлены после выхода из settingsMenu
+	selected_grid_size = 20 # Дефолтные значения, как в main
+	selected_side_length = 10
+	selected_mode = 0
+
 
 	# set cooldown for key clicks
 	cooldown = 150
@@ -257,73 +203,134 @@ def startScreen():
 		for event in pygame.event.get():# user did something
 			if event.type == pygame.QUIT:
 				carryOn = False
-				Run = False
+				Run = False # Этот Run влияет на главный цикл в main
+				next_state = -1 # Выход из игры
 
 		# get pressed keys
 		keys = pygame.key.get_pressed()
 
 		# if the cooldown timer is reached
 		if (pygame.time.get_ticks() - start_timer > cooldown):
-			if current_selection == options[0]:
-				# if user pressed down arrow key
-				if keys[pygame.K_DOWN]:
-					# display selection 1
-					displayMenuSelection(screen, screen_size, 1, WHITE, GOLD, BLACK)
-					current_selection = options[1]
-					# restart cooldown timer
-					start_timer = pygame.time.get_ticks()
-				# if user selected this option, break out of loop
-				if keys[pygame.K_RETURN]:
+			if keys[pygame.K_DOWN]:
+				current_selection_index = (current_selection_index + 1) % len(options)
+				displayMenuSelection(screen, screen_size, current_selection_index, WHITE, GOLD, BLACK)
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_UP]:
+				current_selection_index = (current_selection_index - 1) % len(options)
+				displayMenuSelection(screen, screen_size, current_selection_index, WHITE, GOLD, BLACK)
+				start_timer = pygame.time.get_ticks()
+			elif keys[pygame.K_RETURN]:
+				if current_selection_index == 0: # Start Game
 					carryOn = False
-			elif current_selection == options[1]:
-				# if user pressed up arrow key
-				if keys[pygame.K_UP]:
-					# display selection 0
-					displayMenuSelection(screen, screen_size, 0, WHITE, GOLD, BLACK)
-					current_selection = options[0]
-					start_timer = pygame.time.get_ticks()
-				# if user pressed down arrow key
-				if keys[pygame.K_DOWN]:
-					# display selection 2
-					displayMenuSelection(screen, screen_size, 2, WHITE, GOLD, BLACK)
-					current_selection = options[2]
-					start_timer = pygame.time.get_ticks()
-				if keys[pygame.K_RETURN]:
+					next_state = 1 # Переход к игре
+				elif current_selection_index == 1: # Settings
 					Settings = True
-			elif current_selection == options[2]:
-				# if user pressed up arrow key
-				if keys[pygame.K_UP]:
-					# display selection 1
-					displayMenuSelection(screen, screen_size, 1, WHITE, GOLD, BLACK)
-					current_selection = options[1]
-					start_timer = pygame.time.get_ticks()
-				# enter key to select this option
-				if keys[pygame.K_RETURN]:
+				elif current_selection_index == 2: # Таблица лидеров
+					carryOn = False
+					next_state = 2 # Переход к таблице лидеров
+				elif current_selection_index == 3: # Exit
 					carryOn = False
 					Run = False
+					next_state = -1 # Выход из игры
+
 
 		# if the settings option was selected
 		if Settings:
-			grid_size, side_length, mode = settingsMenu(screen, screen_size, WHITE, GOLD, BLACK, cooldown,\
-											 	 start_timer, grid_size, side_length)			
-			current_selection = options[0]
-			displayMenuSelection(screen, screen_size, 0, WHITE, GOLD, BLACK)
-			# refresh the screen
-			pygame.display.flip()
-			# wait quarter of a second
+			# Передаем screen и screen_size в settingsMenu, а также текущие значения размеров и режима
+			selected_grid_size, selected_side_length, selected_mode = settingsMenu(screen, screen_size, WHITE, GOLD, BLACK, cooldown,\
+											 	 start_timer, selected_grid_size, selected_side_length)
+			# После выхода из настроек, возвращаемся в главное меню
+			current_selection_index = 0
+			displayMenuSelection(screen, screen_size, current_selection_index, WHITE, GOLD, BLACK)
+			pygame.display.flip() # Обновляем экран
 			time.sleep(0.25)
 			start_timer = pygame.time.get_ticks()
 			Settings = False
 
+
 		clock.tick(60)
 
-	pygame.quit()
+	# pygame.quit() # Не вызываем здесь, закрываем в main
 
-	return Run, grid_size, side_length, mode
+	# Возвращаем флаг выполнения (для main), размеры, режим и следующее состояние
+	return Run, selected_grid_size, selected_side_length, selected_mode, next_state
+
+# Функция для отображения таблицы лидеров
+def display_leaderboard_screen(screen, font, leaderboard_data, sort_by='time', screen_size=(800, 600)): # Установили дефолтный размер побольше
+	"""Отображает экран таблицы лидеров."""
+	screen.fill((0, 0, 0)) # Черный фон
+	title_text = font.render("Таблица лидеров", True, (255, 255, 255))
+	# Центрируем заголовок по новому размеру
+	title_rect = title_text.get_rect(center=(screen_size[0] // 2, 50))
+	screen.blit(title_text, title_rect)
+
+	# Сортируем данные
+	if sort_by == 'time':
+		sorted_data = sorted(leaderboard_data, key=lambda x: x.get('time', 0)) # Добавил .get с дефолтным значением на случай отсутствия ключа
+		sort_title = "по времени (сек)"
+	elif sort_by == 'coins':
+		sorted_data = sorted(leaderboard_data, key=lambda x: x.get('coins', 0), reverse=True)
+		sort_title = "по монетам"
+	else:
+		sorted_data = leaderboard_data
+		sort_title = ""
+
+	sort_type_text = font.render(f"Сортировка: {sort_title}", True, (255, 255, 255))
+	screen.blit(sort_type_text, (50, 100))
+
+
+	y_offset = 150
+	for i, entry in enumerate(sorted_data[:15]): # Отображаем топ-15
+		score_text = font.render(
+			f"{i+1}. {entry.get('name', 'Player')} - Время: {entry.get('time', 0):.2f} сек, Монеты: {entry.get('coins', 0)}",
+			True, (255, 255, 255)
+		)
+		screen.blit(score_text, (50, y_offset + i * 30))
+
+	# Добавляем инструкции по сортировке и выходу, центрируя по новой высоте
+	instructions_font = pygame.font.SysFont("ubuntu", 20)
+	instructions_text = instructions_font.render("Нажмите T для сортировки по времени, C для сортировки по монетам, Esc для выхода", True, (255, 255, 255))
+	instructions_rect = instructions_text.get_rect(center=(screen_size[0] // 2, screen_size[1] - 30)) # Центрируем по горизонтали, немного выше нижнего края
+	screen.blit(instructions_text, instructions_rect)
+
+
+	pygame.display.flip()
+
+	# Возвращаем признак того, нужно ли продолжать отображение таблицы
+	return True
+
+# Функция для экрана таблицы лидеров
+def leaderboardScreen(screen, screen_size): # screen_size теперь передается
+	pygame.display.set_caption("Таблица лидеров")
+	font = pygame.font.SysFont("ubuntu", 30)
+	current_sort = 'time' # Сортировка по умолчанию
+	leaderboard_data = load_leaderboard() # Загружаем данные
+
+	carryOn = True
+	while carryOn:
+		for event in pygame.event.get():
+			if event.type == pygame.QUIT:
+				carryOn = False
+				return -1 # Сигнал выхода из игры
+			elif event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_ESCAPE:
+					carryOn = False
+				elif event.key == pygame.K_t:
+					current_sort = 'time'
+				elif event.key == pygame.K_c:
+					current_sort = 'coins'
+
+		# Передаем screen_size в display_leaderboard_screen
+		display_leaderboard_screen(screen, font, leaderboard_data, sort_by=current_sort, screen_size=screen_size)
+
+	pygame.display.set_caption("Main Menu")
+	return 0 # Возвращаемся в главное меню
 
 # end game screen
-def endGame(mode, value):
-	pygame.init()
+def endGame(mode, value): # Не принимаем screen и screen_size, так как они будут доступны через pygame.display.get_surface()
+	# pygame.init() # Не вызываем здесь
+	screen = pygame.display.get_surface() # Получаем текущую поверхность
+	screen_size = screen.get_size() # Получаем текущий размер
 
 	# Define colours
 	BLACK = (0,0,0)
@@ -333,12 +340,9 @@ def endGame(mode, value):
 	GREEN = (0,255,0)
 	BLUE = (0,0,255)
 
-	screen_size = (500,500)
-	screen = pygame.display.set_mode(screen_size)
 	pygame.display.set_caption("Game Over")
 	screen.fill(WHITE)
-
-	pygame.display.flip()
+	# pygame.display.flip() # Не нужно здесь, вызывается в displayMessage
 
 	if mode == 0:
 		text = "Time: " + str(value) + " s"
@@ -372,24 +376,17 @@ def endGame(mode, value):
 			displayMessage(text, GRAY, screen, 30, screen_size, screen_size[1]*2//4)
 		displayMessage("Press enter to exit to menu.", BLACK, screen, 20, screen_size,screen_size[1]*3//4)
 
-
 	carryOn = True
-
 	clock = pygame.time.Clock()
-
 	while carryOn:
-
 		# action (close screen)
 		for event in pygame.event.get():# user did something
 			if event.type == pygame.QUIT:
 				carryOn = False
-
 		# get keys pressed
 		keys = pygame.key.get_pressed()
-
 		if keys[pygame.K_RETURN]:
 			carryOn = False
-
 		clock.tick(60)
 
-	pygame.quit()
+	# pygame.quit() # Не вызываем здесь
