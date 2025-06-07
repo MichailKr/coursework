@@ -8,6 +8,8 @@ from src.camera import Camera
 from src.item import Tool
 import pytmx
 import os
+import math
+import time
 
 
 class GameManager:
@@ -23,6 +25,19 @@ class GameManager:
         self.running = True
         self.paused = False
         self.clock = pygame.time.Clock()
+
+        self.clock_size = 75
+        self.clock_bg = None
+        self.clock_arrow = None
+        self.clock_pos = None
+
+        # игровое время
+        self.game_time = 0 # секунды
+        self.last_time_update = 0 # последнее обновление
+
+        # затемнение
+        self.night_overlay = None
+        self.is_night = False
 
         self.settings = {
             'sound_volume': 0.7,
@@ -78,6 +93,8 @@ class GameManager:
         self.camera = Camera(screen.get_width(), screen.get_height())
         print(f"Камера создана с размерами {screen.get_width()}x{screen.get_height()}")
 
+        self.init_clock(screen)
+
         if self.map_loaded and hasattr(self, 'tmx_data'):
             map_width = self.tmx_data.width * self.tmx_data.tilewidth
             map_height = self.tmx_data.height * self.tmx_data.tileheight
@@ -132,6 +149,8 @@ class GameManager:
 
             # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
+            
+            self.update_clock()
 
             # Отображение производительности (FPS)
             self.frame_times.append(delta_time)
@@ -182,6 +201,8 @@ class GameManager:
             for sprite in self.all_sprites:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
+            
+            self.draw_clock(screen)
 
             # Отрисовка интерфейса (не зависит от камеры)
             self.draw_inventory_and_hotbar(screen)
@@ -235,6 +256,60 @@ class GameManager:
                         item_surface.fill((0, 0, 255))
                         screen.blit(item_surface, (slot_x + 10, slot_y + 10))
 
+    def init_clock(self, screen):
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+        
+        offset = 10
+
+        self.clock_pos = (screen_width - self.clock_size - offset, offset)
+
+        try:
+            self.clock_bg = pygame.image.load("sprites/clock/clock_bg.png").convert_alpha()
+            self.clock_arrow = pygame.image.load("sprites/clock/clock_arrow.png").convert_alpha()
+        except:
+            self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
+            self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+            pygame.draw.rect(self.clock_arrow, (50, 50, 50), 
+                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
+                            
+        # если нужен будет рескейл
+        # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
+        # self.clock_arrow = pygame.transform.scale(self.clock_arrow, (self.clock_size, self.clock_size))
+        
+        self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
+        self.night_overlay.fill((0, 0, 0, 180))
+
+    def draw_clock(self, screen):
+        screen.blit(self.clock_bg, self.clock_pos)
+        
+        angle = math.radians(self.game_time * -0.5)
+        
+        rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
+        arrow_rect = rotated_arrow.get_rect(center=(
+            self.clock_pos[0] + self.clock_size // 2,
+            self.clock_pos[1] + self.clock_size // 2
+        ))
+        screen.blit(rotated_arrow, arrow_rect)
+        
+        if self.is_night:
+            screen.blit(self.night_overlay, (0, 0))
+    
+    def update_clock(self):
+        # для дебага
+        # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
+
+        current_time = time.time()
+        if current_time - self.last_time_update >= 1:
+            self.game_time += 1
+            self.last_time_update = current_time
+        
+        if self.game_time >= 720:
+            self.game_time = 0
+        
+        self.is_night = (self.game_time // 60) % 12 == 11
+
     def render_map(self, screen):
         """Отрисовка карты"""
         if not self.map_loaded:
@@ -285,6 +360,7 @@ class GameManager:
             map_width = self.tmx_data.width * self.tmx_data.tilewidth
             map_height = self.tmx_data.height * self.tmx_data.tileheight
             self.camera.set_map_size(map_width, map_height)
+            self.init_clock(screen)
 
         print(f"Переключен режим экрана, новые размеры: {screen.get_width()}x{screen.get_height()}")
 
