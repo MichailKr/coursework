@@ -31,9 +31,11 @@ def displayMessage(text, colour, screen, size, screen_size, y_pos, screen_update
 # displays the user selection of the Main Menu
 # bg_colour: background colour, a_colout: active colour, na_colour: inactive colour
 def displayMenuSelection(screen, screen_size, choice, bg_colour, a_colour, na_colour):
-	screen.fill(bg_colour)
+	background_image = pygame.image.load('fon.jpg').convert()
+	background_image = pygame.transform.scale(background_image, screen.get_size())
+	screen.blit(background_image, (0, 0))
 	# Обновляем пункты меню, добавив "Таблица лидеров"
-	menu_items = ["Yet Another Maze", "Start Game", "Settings", "Таблица лидеров", "Exit"]
+	menu_items = ["Dungeon of Kuksik", "Старт", "Настройки", "Таблица лидеров", "Выход"]
 
 	# Рассчитываем вертикальный шаг между пунктами
 	# Учитываем, что первый пункт - это заголовок и он не выбирается
@@ -52,24 +54,23 @@ def displayMenuSelection(screen, screen_size, choice, bg_colour, a_colour, na_co
 		# Позиции выбираемых пунктов: отступ заголовка + (индекс пункта + 1) * шаг
 		y_positions.append(screen_size[1]//5 + item_spacing * (i + 1))
 
-
 	for i, item in enumerate(menu_items):
-		if i == 0: # Заголовок
-			# Передаем screen_size в displayMessage
-			displayMessage(item, na_colour, screen, 50, screen_size, y_positions[i])
-		else: # Выбираемые пункты
-			# Индекс выбора относится только к выбираемым пунктам (начиная с 0 для "Start Game")
-			color = a_colour if i - 1 == choice else na_colour
-			# Передаем screen_size в displayMessage
+		if i == 0:  # Заголовок
+			displayMessage(item, (249,166,2), screen, 50, screen_size, y_positions[i])  # Красный цвет
+		else:  # Пункты меню
+			color = (255, 0,
+					 0) if i - 1 == choice else na_colour  # Все пункты красные, активный - красный, остальные - na_colour
 			displayMessage(item, color, screen, 30, screen_size, y_positions[i])
 
 
 # display settings options
 # takes in additional grid size and side length parameters
 def displaySettingsSeleciton(screen, screen_size, choice, bg_colour, a_colour, na_colour, grid_size, side_length, mode_text):
-	screen.fill(bg_colour)
-	grid_text = "Grid size: " + str(grid_size)
-	side_text = "Side length: " + str(side_length)
+	background_image = pygame.image.load('fon.jpg').convert()
+	background_image = pygame.transform.scale(background_image, screen.get_size())
+	screen.blit(background_image, (0, 0))
+	grid_text = "Размер сетки: " + str(grid_size)
+	side_text = "Длина клетки: " + str(side_length)
 	# this is the position of the largest rectangle for mode text to update
 	mode_text_rect = (176,316,149,34) # Возможно, эту координату тоже нужно пересчитать для нового размера экрана
 
@@ -77,10 +78,10 @@ def displaySettingsSeleciton(screen, screen_size, choice, bg_colour, a_colour, n
 	items = [
 		("Settings", na_colour, 60, screen_size[1]//6),
 		# Используем BLACK для невыбранных пунктов в меню настроек
-		(grid_text, a_colour if choice == 0 else (0, 0, 0), 30, screen_size[1]*2//6), # BLACK = (0, 0, 0)
-		(side_text, a_colour if choice == 1 else (0, 0, 0), 30, screen_size[1]*3//6), # BLACK = (0, 0, 0)
-		(mode_text, a_colour if choice == 2 else (0, 0, 0), 30, screen_size[1]*4//6), # BLACK = (0, 0, 0)
-		("Return", a_colour if choice == 3 else (0, 0, 0), 30, screen_size[1]*5//6) # BLACK = (0, 0, 0)
+		(grid_text, a_colour if choice == 0 else (255, 255, 255), 30, screen_size[1]*2//6), # BLACK = (0, 0, 0)
+		(side_text, a_colour if choice == 1 else (255, 255, 255), 30, screen_size[1]*3//6), # BLACK = (0, 0, 0)
+		(mode_text, a_colour if choice == 2 else (255, 255, 255), 30, screen_size[1]*4//6), # BLACK = (0, 0, 0)
+		("Return", a_colour if choice == 3 else (255, 255, 255), 30, screen_size[1]*5//6) # BLACK = (0, 0, 0)
 	]
 
 	for i, (text, color, size, y_pos) in enumerate(items):
@@ -90,15 +91,17 @@ def displaySettingsSeleciton(screen, screen_size, choice, bg_colour, a_colour, n
 
 # settings function - enables user to choose size of the map
 def settingsMenu(screen, screen_size, bg_colour, a_colour, na_colour, cooldown, start_timer, g_size, s_length): # Теперь принимаем screen и screen_size
-	options = {0:"Grid Size", 1:"Side Length", 2:"Mode", 3:"Return"} # Обновили опции
-	modes = {0:"Solo", 1:"Two Player", 2:"Race", 3:"Chase", 4:"Escape"}
+	options = {0:"Размер сетки", 1:"Длина клетки", 2:"Режим", 3:"Назад"} # Обновили опции
+	modes = {0:"В одиночку", 1:"Вдвоем", 2:"Race", 3:"Chase", 4:"Escape"}
 	current_mode = 0
 	current_selection_index = 0 # Используем индекс для выбора
 	grid_size = g_size
 	side_length = s_length
 
-	pygame.display.set_caption("Settings")
-	screen.fill(bg_colour)
+	pygame.display.set_caption("Настройки")
+	background_image = pygame.image.load('fon.jpg').convert()
+	background_image = pygame.transform.scale(background_image, screen.get_size())
+	screen.blit(background_image, (0, 0))
 	pygame.display.flip()
 
 	displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
@@ -142,18 +145,18 @@ def settingsMenu(screen, screen_size, bg_colour, a_colour, na_colour, cooldown, 
 				if current_selection_index == 0:
 					grid_size = min(35, grid_size + 1)
 				elif current_selection_index == 1:
-					side_length = min(15, side_length + 1)
+					side_length = min(30, side_length + 1)
 				elif current_selection_index == 2:
 					current_mode = min(4, current_mode + 1)
 				displaySettingsSeleciton(screen, screen_size, current_selection_index, bg_colour, a_colour, na_colour,\
 										 grid_size, side_length, modes[current_mode])
 				start_timer = pygame.time.get_ticks()
-			elif keys[pygame.K_RETURN] and current_selection_index == 3: # Выход при выборе "Return"
+			elif keys[pygame.K_RETURN] and current_selection_index == 3: # Выход при выборе "Return"1510
 				carryOn = False
 
 
 	# reset the caption
-	pygame.display.set_caption("Main Menu")
+	pygame.display.set_caption("Главное меню")
 	# return selected grid size, side length и mode
 	return grid_size, side_length, current_mode
 
@@ -162,7 +165,7 @@ def startScreen(screen, screen_size): # Теперь принимаем screen �
 	# pygame.init() # Не вызываем здесь, инициализация в main
 	# default maze settings - эти значения теперь задаются в main
 	# grid_size = 20 # Удаляем инициализацию
-	# side_length = 10 # Удаляем инициализацию
+	# side_length = 10 # Удаляем инициализацию15
 	# mode = 0 # Удаляем инициализацию
 
 	# Define colours
@@ -171,11 +174,11 @@ def startScreen(screen, screen_size): # Теперь принимаем screen �
 	GOLD = (249,166,2)
 	# screen_size = (800,600) # Размер окна задается в main и передается сюда
 	# screen = pygame.display.set_mode(screen_size) # Не создаем новое окно, используем переданное
-	pygame.display.set_caption("Main Menu")
+	pygame.display.set_caption("Главное меню")
 	screen.fill(WHITE)
 	pygame.display.flip()
 
-	options = {0:"Start Game", 1:"Settings", 2:"Таблица лидеров", 3:"Exit"} # Обновили опции меню
+	options = {0:"Старт", 1:"Настройки", 2:"Таблица лидеров", 3:"Выход"} # Обновили опции меню
 	current_selection_index = 0 # Используем индекс
 	displayMenuSelection(screen, screen_size, current_selection_index, WHITE, GOLD, BLACK)
 
@@ -190,7 +193,7 @@ def startScreen(screen, screen_size): # Теперь принимаем screen �
     # Переменные для хранения выбора из настроек, инициализация перед циклом
 	# Эти значения будут обновлены после выхода из settingsMenu
 	selected_grid_size = 20 # Дефолтные значения, как в main
-	selected_side_length = 10
+	selected_side_length = 22
 	selected_mode = 0
 
 

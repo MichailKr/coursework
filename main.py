@@ -15,6 +15,11 @@ from leaderboard import load_leaderboard, add_score_to_leaderboard
 def set_window_position(x, y):
 	os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (x,y)
 
+def load_background(screen):
+    fon = pygame.image.load('fon.jpg').convert()
+    fon = pygame.transform.scale(fon, screen.get_size())
+    return fon
+
 # creates a grid of size (size)*(size)
 def create_grid(size):
 	# create a graph for the grid
@@ -105,6 +110,20 @@ def draw_maze(screen, maze, size, colour, side_length, border_width, offset_x):
 def draw_position(screen, side_length, border_width, current_point, colour, offset_x):
 	pygame.draw.rect(screen, colour, [offset_x + border_width+(side_length+border_width)*current_point[0],\
 					 border_width+(side_length+border_width)*current_point[1], side_length, side_length])
+
+
+def draw_coin(screen, coin_image, current_point, side_length, border_width, offset_x, scale_factor=1):
+	# Масштабируем изображение
+	new_width = int(coin_image.get_width() * scale_factor)
+	new_height = int(coin_image.get_height() * scale_factor)
+	scaled_image = pygame.transform.scale(coin_image, (new_width, new_height))
+
+	x = offset_x + border_width + (side_length + border_width) * current_point[0]
+	y = border_width + (side_length + border_width) * current_point[1]
+	# Центрируем изображение в клетке
+	image_rect = scaled_image.get_rect()
+	image_rect.center = (x + side_length // 2, y + side_length // 2)
+	screen.blit(scaled_image, image_rect)
 
 # takes in a player2 character, maze, vertices, cooldown, and timer
 def playerTwo(player2, maze, vertices, cooldown, timer):
@@ -230,18 +249,20 @@ def update_console(screen, screen_size, side_length, text_size, a_colour, na_col
 def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь принимаем screen и screen_size
 	# initialize the game engine
 	# pygame.init() # Не вызываем здесь, инициализация в main
-
+	coin_image = pygame.image.load('coin.png').convert_alpha()
+	acc_image = pygame.image.load('acc.png').convert_alpha()
+	slow_image = pygame.image.load('slow.png').convert_alpha()
 	# Defining colours (RGB) ...
 	BLACK = (0,0,0)
 	GRAY = (100,100,100)
-	WHITE = (255,255,255)
+	WHITE = (111,22,125)
 	GOLD = (249,166,2)
 	GREEN = (0,255,0)
 	RED = (255,0,0)
 	BLUE = (0,0,255)
 	COIN_COLOR = GOLD # Цвет монет
 	ACCELERATOR_COLOR = (0, 255, 255) # Цвет ускорителя (Cyan)
-	SLOWDOWN_COLOR = (255, 0, 255) # Цвет замедлителя (Magenta)
+	SLOWDOWN_COLOR = (255, 0, 255) # Цвет замедлителя (Magenta)Таблица
 	HUD_BG_COLOR = (30, 30, 30) # Цвет фона HUD панели
 
 	# set the grid size and side length of each grid
@@ -706,16 +727,15 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 
 		# Отрисовываем оставшиеся монеты
 		for coin_pos in coin_positions:
-			draw_position(screen, side_length, border_width, coin_pos, COIN_COLOR, offset_x) # Передаем offset_x
+			draw_coin(screen, coin_image, coin_pos, side_length, border_width, offset_x)
 
 		# Отрисовываем оставшиеся ускорители
 		for acc_pos in accelerator_positions:
-			draw_position(screen, side_length, border_width, acc_pos, ACCELERATOR_COLOR, offset_x) # Передаем offset_x
+			draw_coin(screen, acc_image, acc_pos, side_length, border_width, offset_x)
 
 		# Отрисовываем оставшиеся замедлители
 		for slow_pos in slowdown_positions:
-			draw_position(screen, side_length, border_width, slow_pos, SLOWDOWN_COLOR, offset_x) # Передаем offset_x
-
+			draw_coin(screen, slow_image, slow_pos, side_length, border_width, offset_x)
 		# Отрисовка персонажей и конечных точек (после всех предметов)
 		draw_position(screen, side_length, border_width, end_point, RED, offset_x) # Передаем offset_x
 		if mode == 1:
@@ -852,7 +872,8 @@ if __name__ == "__main__":
 	# Создаем поверхность экрана один раз в начале
 	screen_size = (800, 600) # Дефольный размер окна для меню и таблицы лидеров
 	screen = pygame.display.set_mode(screen_size)
-
+	fon = load_background(screen)
+	screen.blit(fon, (0, 0))
 
 	while Run:
 		if current_state == states[0]: # Главное меню
