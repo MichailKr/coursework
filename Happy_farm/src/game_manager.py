@@ -325,7 +325,7 @@ class GameManager:
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
-        self.screen_manager.toggle_screen_mode('fullscreen')
+        self.screen_manager.toggle_screen_mode()
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
         if self.map_loaded and hasattr(self, 'tmx_data'):
