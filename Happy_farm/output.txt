@@ -67,42 +67,10 @@ class Camera:
         self.offset.x = max(0, min(self.offset.x, self.map_width - self.width))
         self.offset.y = max(0, min(self.offset.y, self.map_height - self.height))
 
-
-
-==================== collect.py ====================
-
-import glob
-
-
-def main():
-    with open('../output.txt', 'w', encoding='utf-8') as outfile:
-        # Собираем все .php и .css файлы
-        for filename in glob.glob('*.py'):
-            # Записываем название файла
-            outfile.write(f"\n{'=' * 20} {filename} {'=' * 20}\n\n")
-
-            try:
-                # Читаем содержимое файла
-                with open(filename, 'r', encoding='utf-8') as infile:
-                    content = infile.read()
-                    # Записываем содержимое в выходной файл
-                    outfile.write(content)
-                    outfile.write('\n\n')
-            except Exception as e:
-                # Обработка ошибок чтения файла
-                outfile.write(f"⚠️ Ошибка чтения файла {filename}: {str(e)}\n\n")
-                print(f"Ошибка: {e}")
-
-
-if __name__ == "__main__":
-    main()
-
-
-
 ==================== event_handler.py ====================
 
 import pygame
-from src.game_state import GameState
+from Happy_farm.src.game_state import GameState
 
 
 class EventHandler:
@@ -234,13 +202,12 @@ class EventHandler:
 ==================== game_manager.py ====================
 
 import pygame
-from src.game_state import GameState
-from src.screen_manager import ScreenManager
-from src.event_handler import EventHandler
-from src.render_manager import RenderManager
-from src.player import Player
-from src.camera import Camera
-from src.item import Tool
+from Happy_farm.src.game_state import GameState
+from Happy_farm.src.screen_manager import ScreenManager
+from Happy_farm.src.event_handler import EventHandler
+from Happy_farm.src.render_manager import RenderManager
+from Happy_farm.src.player import Player
+from Happy_farm.src.camera import Camera
 import pytmx
 import os
 
@@ -282,12 +249,6 @@ class GameManager:
             'medium': pygame.font.Font(None, 36),
             'large': pygame.font.Font(None, 48)
         }
-
-        # self.tools = {
-        #     'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
-        #     'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
-        #     'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
-        # }
 
         self.inventory_open = False
         self.selected_item_index = 0
@@ -511,7 +472,7 @@ class GameManager:
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
-        self.screen_manager.toggle_screen_mode()
+        self.screen_manager.toggle_screen_mode('fullscreen')
 
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
@@ -584,35 +545,10 @@ class GameState(Enum):
 
 
 
-==================== item.py ====================
-
-import pygame
-
-
-class Item(pygame.sprite.Sprite):
-    def __init__(self, name, image, tool_type):
-        super().__init__()
-        self.name = name
-        self.image = image
-        self.rect = self.image.get_rect()
-        self.tool_type = tool_type  # hoe, axe, wateringcan
-
-    def use(self, target):
-        pass  # Реализуем в подклассах
-
-
-class Tool(Item):
-    def __init__(self, name, image, tool_type, durability=100):
-        super().__init__(name, image, tool_type)
-        self.durability = durability
-        self.max_durability = durability
-
-
-
 ==================== map_renderer.py ====================
 
 import pygame
-from src.tilemap import TiledMap
+from Happy_farm.src.tilemap import TiledMap
 
 
 class MapRenderer:
@@ -835,7 +771,7 @@ class Player(pygame.sprite.Sprite):
 ==================== render_manager.py ====================
 
 import pygame
-from src.map_renderer import MapRenderer
+from Happy_farm.src.map_renderer import MapRenderer
 
 class RenderManager:
     def __init__(self, screen_manager):
@@ -1137,8 +1073,8 @@ class ResourceLoader:
 ==================== screen_manager.py ====================
 
 import pygame
-from src.settings import WINDOW_SIZE
-from src.settings import FULLSCREEN_SIZE
+from Happy_farm.src.settings import WINDOW_SIZE
+from Happy_farm.src.settings import FULLSCREEN_SIZE
 
 class ScreenManager:
     def __init__(self):
@@ -1146,13 +1082,13 @@ class ScreenManager:
         self.screen = pygame.display.set_mode(WINDOW_SIZE[self.current_mode])
         pygame.display.set_caption("Happy Farm")
 
-    def toggle_screen_mode(self):
-        if self.current_mode == 'windowed':
-            self.current_mode = 'fullscreen'
-            self.screen = pygame.display.set_mode(WINDOW_SIZE['fullscreen'], pygame.FULLSCREEN)
-        else:
-            self.current_mode = 'windowed'
-            self.screen = pygame.display.set_mode(WINDOW_SIZE['windowed'])
+    def toggle_screen_mode(self, mode):
+        if mode != self.current_mode:
+            self.current_mode = mode
+            if mode == 'fullscreen':
+                self.screen = pygame.display.set_mode(WINDOW_SIZE[mode], pygame.FULLSCREEN)
+            else:
+                self.screen = pygame.display.set_mode(WINDOW_SIZE[mode])
 
     def get_screen(self):
         return self.screen

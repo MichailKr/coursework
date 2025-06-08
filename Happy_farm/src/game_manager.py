@@ -1,12 +1,10 @@
 import pygame
-from src.game_state import GameState
-from src.screen_manager import ScreenManager
-from src.event_handler import EventHandler
-from src.render_manager import RenderManager
-from src.player import Player
-from src.camera import Camera
-from src.item import Tool
-from src.item import Item
+from Happy_farm.src.game_state import GameState
+from Happy_farm.src.screen_manager import ScreenManager
+from Happy_farm.src.event_handler import EventHandler
+from Happy_farm.src.render_manager import RenderManager
+from Happy_farm.src.player import Player
+from Happy_farm.src.camera import Camera
 import pytmx
 import os
 
@@ -49,11 +47,11 @@ class GameManager:
             'large': pygame.font.Font(None, 48)
         }
 
-        # self.tools = {
-        #     'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
-        #     'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
-        #     'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
-        # }
+        self.tools = {
+            'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
+            'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
+            'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
+        }
 
         self.inventory_open = False
         self.selected_item_index = 0
@@ -84,23 +82,6 @@ class GameManager:
             map_height = self.tmx_data.height * self.tmx_data.tileheight
             self.camera.set_map_size(map_width, map_height)
             print(f"Размеры карты для камеры установлены: {map_width}x{map_height}")
-
-            # Initialize inventory
-            self.dragged_item = None
-            self.hotbar_slots = [None] * 8
-            self.inventory_slots = [[None for _ in range(3)] for _ in range(8)]
-
-            # Load tool sprites and create items
-            self.tools = {
-                'hoe': Item('Мотыга', pygame.image.load('/sprites/tools_sprites/hoe.png'), 'hoe'),
-                'axe': Item('Топор', pygame.image.load('/sprites/tools_sprites/axe.png'), 'axe'),
-                'wateringcan': Item('Лейка', pygame.image.load('/sprites/tools_sprites/watering_can.png'), 'wateringcan')
-            }
-
-            # Add tools to hotbar initially
-            self.hotbar_slots[0] = self.tools['hoe']
-            self.hotbar_slots[1] = self.tools['axe']
-            self.hotbar_slots[2] = self.tools['wateringcan']
 
         self.init_game_objects()
 
@@ -294,7 +275,7 @@ class GameManager:
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
-        self.screen_manager.toggle_screen_mode()
+        self.screen_manager.toggle_screen_mode('fullscreen')
 
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
