@@ -16,11 +16,9 @@ class GameManager:
     def __init__(self):
         pygame.init()
         pygame.font.init()
-
         self.screen_manager = ScreenManager()
         self.event_handler = EventHandler(self)
         self.render_manager = RenderManager(self.screen_manager)
-
         self.state = GameState.MENU
         self.running = True
         self.paused = False
@@ -80,6 +78,7 @@ class GameManager:
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
 
+        # Загрузка карты
         self.map_loaded = False
         try:
             self.tmx_data = pytmx.load_pygame('maps/maps.tmx')
@@ -103,9 +102,10 @@ class GameManager:
 
         self.init_game_objects()
 
+        # Счётчик FPS
         self.fps = 0
-        self.frame_times = []
-        self.last_update_time = pygame.time.get_ticks()
+        self.fps_counter = 0
+        self.fps_timer = pygame.time.get_ticks()
 
         print("GameManager инициализирован успешно")
 
@@ -149,20 +149,16 @@ class GameManager:
 
             # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
-            
+
             self.update_clock()
 
-            # Отображение производительности (FPS)
-            self.frame_times.append(delta_time)
-            if len(self.frame_times) > 100:
-                self.frame_times.pop(0)
-
-            # Обновляем FPS каждые 500 мс
+            # Подсчёт FPS
+            self.fps_counter += 1
             current_time = pygame.time.get_ticks()
-            if current_time - self.last_update_time > 500:
-                if self.frame_times:
-                    self.fps = int(1.0 / (sum(self.frame_times) / len(self.frame_times)))
-                self.last_update_time = current_time
+            if current_time - self.fps_timer >= 1000:
+                self.fps = self.fps_counter
+                self.fps_counter = 0
+                self.fps_timer = current_time
 
     def draw(self):
         """Отрисовка текущего состояния игры"""
@@ -174,37 +170,20 @@ class GameManager:
             self.render_manager.draw_settings(self)
         elif self.state == GameState.GAME:
             # Очистка экрана
-            screen.fill((50, 50, 50))  # Серый фон, чтобы видеть, что экран очищается
+            screen.fill((50, 50, 50))  # Серый фон
 
-            # Отрисовка карты
+            # Отрисовка только видимой части карты
             if self.map_loaded:
-                # Отрисовка каждого слоя карты
-                for layer in self.tmx_data.visible_layers:
-                    if hasattr(layer, 'data'):  # Если это слой тайлов
-                        for x in range(layer.width):
-                            for y in range(layer.height):
-                                tile = layer.data[y][x]
-                                if tile:
-                                    # Получаем изображение тайла
-                                    tile_image = self.tmx_data.get_tile_image_by_gid(tile)
-                                    if tile_image:
-                                        # Применяем смещение камеры к координатам тайла
-                                        pos = self.camera.apply_rect(pygame.Rect(
-                                            x * self.tmx_data.tilewidth,
-                                            y * self.tmx_data.tileheight,
-                                            self.tmx_data.tilewidth,
-                                            self.tmx_data.tileheight
-                                        ))
-                                        screen.blit(tile_image, pos)
+                self.render_map(screen)
 
             # Отрисовка всех спрайтов
             for sprite in self.all_sprites:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
-            
+
             self.draw_clock(screen)
 
-            # Отрисовка интерфейса (не зависит от камеры)
+            # Отрисовка интерфейса
             self.draw_inventory_and_hotbar(screen)
 
             # Отрисовка FPS (для отладки)
@@ -259,7 +238,7 @@ class GameManager:
     def init_clock(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
-        
+
         offset = 10
 
         self.clock_pos = (screen_width - self.clock_size - offset, offset)
@@ -271,31 +250,31 @@ class GameManager:
             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-            pygame.draw.rect(self.clock_arrow, (50, 50, 50), 
+            pygame.draw.rect(self.clock_arrow, (50, 50, 50),
                             (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
-                            
+
         # если нужен будет рескейл
         # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
         # self.clock_arrow = pygame.transform.scale(self.clock_arrow, (self.clock_size, self.clock_size))
-        
+
         self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
         self.night_overlay.fill((0, 0, 0, 180))
 
     def draw_clock(self, screen):
         screen.blit(self.clock_bg, self.clock_pos)
-        
+
         angle = math.radians(self.game_time * -0.5)
-        
+
         rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
         arrow_rect = rotated_arrow.get_rect(center=(
             self.clock_pos[0] + self.clock_size // 2,
             self.clock_pos[1] + self.clock_size // 2
         ))
         screen.blit(rotated_arrow, arrow_rect)
-        
+
         if self.is_night:
             screen.blit(self.night_overlay, (0, 0))
-    
+
     def update_clock(self):
         # для дебага
         # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
@@ -304,36 +283,31 @@ class GameManager:
         if current_time - self.last_time_update >= 1:
             self.game_time += 1
             self.last_time_update = current_time
-        
+
         if self.game_time >= 720:
             self.game_time = 0
-        
+
         self.is_night = (self.game_time // 60) % 12 == 11
 
     def render_map(self, screen):
         """Отрисовка карты"""
         if not self.map_loaded:
             return
-
         # Получаем смещение камеры
         camera_offset = self.camera.offset
-
         # Размер тайла
         tile_width = self.tmx_data.tilewidth
         tile_height = self.tmx_data.tileheight
-
         # Вычисляем видимую область в тайлах
         start_x = int(camera_offset.x) // tile_width
         end_x = start_x + (screen.get_width() // tile_width) + 2
         start_y = int(camera_offset.y) // tile_height
         end_y = start_y + (screen.get_height() // tile_height) + 2
-
         # Ограничиваем индексы границами карты
         start_x = max(0, start_x)
         start_y = max(0, start_y)
         end_x = min(self.tmx_data.width, end_x)
         end_y = min(self.tmx_data.height, end_y)
-
         # Отрисовка видимых тайлов
         for layer in self.tmx_data.visible_layers:
             if hasattr(layer, 'data'):
@@ -351,11 +325,9 @@ class GameManager:
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
-        self.screen_manager.toggle_screen_mode()
-
+        self.screen_manager.toggle_screen_mode('fullscreen')
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
-
         if self.map_loaded and hasattr(self, 'tmx_data'):
             map_width = self.tmx_data.width * self.tmx_data.tilewidth
             map_height = self.tmx_data.height * self.tmx_data.tileheight
@@ -380,12 +352,10 @@ class GameManager:
 
     def run(self):
         self.load_settings()
-
         while self.running:
             self.handle_events()
             self.update()
             self.draw()
-
         self.save_settings()
         pygame.quit()
 
@@ -404,9 +374,7 @@ class GameManager:
         self.npcs.empty()
         self.obstacles.empty()
         self.items.empty()
-
         self.init_game_objects()
         self.state = GameState.MENU
         self.paused = False
-
         print("Игра сброшена в начальное состояние")
