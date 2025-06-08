@@ -112,18 +112,18 @@ def draw_position(screen, side_length, border_width, current_point, colour, offs
 					 border_width+(side_length+border_width)*current_point[1], side_length, side_length])
 
 
-def draw_coin(screen, coin_image, current_point, side_length, border_width, offset_x, scale_factor=1):
-	# Масштабируем изображение
-	new_width = int(coin_image.get_width() * scale_factor)
-	new_height = int(coin_image.get_height() * scale_factor)
-	scaled_image = pygame.transform.scale(coin_image, (new_width, new_height))
+def draw_coin(screen, coin_image, current_point, side_length, border_width, offset_x, scale_factor=2):
+    # Масштабируем изображение
+    new_width = int(coin_image.get_width() * scale_factor)
+    new_height = int(coin_image.get_height() * scale_factor)
+    scaled_image = pygame.transform.scale(coin_image, (new_width, new_height))
 
-	x = offset_x + border_width + (side_length + border_width) * current_point[0]
-	y = border_width + (side_length + border_width) * current_point[1]
-	# Центрируем изображение в клетке
-	image_rect = scaled_image.get_rect()
-	image_rect.center = (x + side_length // 2, y + side_length // 2)
-	screen.blit(scaled_image, image_rect)
+    x = offset_x + border_width + (side_length + border_width) * current_point[0]
+    y = border_width + (side_length + border_width) * current_point[1]
+    # Центрируем изображение в клетке
+    image_rect = scaled_image.get_rect()
+    image_rect.center = (x + side_length // 2, y + side_length // 2)
+    screen.blit(scaled_image, image_rect)
 
 # takes in a player2 character, maze, vertices, cooldown, and timer
 def playerTwo(player2, maze, vertices, cooldown, timer):
