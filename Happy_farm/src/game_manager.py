@@ -1,4 +1,5 @@
 import pygame
+from src.shop import Shop
 from src.game_state import GameState
 from src.screen_manager import ScreenManager
 from src.event_handler import EventHandler
@@ -99,6 +100,7 @@ class GameManager:
 
         self.all_sprites = pygame.sprite.Group()
         self.players = pygame.sprite.Group()
+        
         self.npcs = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
@@ -173,6 +175,7 @@ class GameManager:
         self.fps = 0
         self.fps_counter = 0
         self.fps_timer = pygame.time.get_ticks()
+        self.shop = Shop(self)
 
         print("GameManager инициализирован успешно")
 
@@ -337,22 +340,45 @@ class GameManager:
             self.running = False
             return False
 
+        # Обработка событий клавиатуры
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+                return False
+            
+            if event.type == pygame.KEYDOWN:
+                # Обработка клавиши взаимодействия (E)
+                if event.key == self.settings['controls']['interact']:  # pygame.K_e
+    # Проверяем взаимодействие с магазином
+                    if hasattr(self.shop, 'is_player_in_range') and self.shop.is_player_in_range():
+                        self.shop.toggle_shop()
+                        print("Магазин открыт/закрыт")
+                    
+                    # Проверяем взаимодействие с другими объектами
+                    # ... другие взаимодействия
+
         keys = pygame.key.get_pressed()
+        
         # Обработка выбора слота хотбара клавишами 1-8
         for i in range(8):
             if keys[getattr(pygame, f'K_{i + 1}')]:
                 self.selected_item_index = i
-                print(f"Выбран слот хотбара: {self.selected_item_index}") # Отладочный вывод
+                print(f"Выбран слот хотбара: {self.selected_item_index}")
 
         # Обработка открытия/закрытия инвентаря клавишей T
-        if keys[pygame.K_t] and not hasattr(self, '_t_pressed'): # Добавил проверку, чтобы избежать многократного переключения при удержании
-             self._t_pressed = True
-             self.inventory_open = not self.inventory_open
-             print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}")
+        if keys[pygame.K_t] and not hasattr(self, '_t_pressed'):
+            self._t_pressed = True
+            self.inventory_open = not self.inventory_open
+            print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}")
         elif not keys[pygame.K_t] and hasattr(self, '_t_pressed'):
-             del self._t_pressed # Сбрасываем флаг после отпускания клавиши
+            del self._t_pressed
+        if not hasattr(self, 'shop'):
+            print("Ошибка: self.shop не инициализирован!")
+            return False
 
-
+        if not isinstance(self.shop, Shop):
+            print("Ошибка: self.shop не является экземпляром Shop!")
+            return False
         return True
 
     def init_game_objects(self):
@@ -435,6 +461,7 @@ class GameManager:
 
             # Отрисовка интерфейса (всегда поверх всего остального)
             self.draw_inventory_and_hotbar(screen)
+            self.shop.draw(screen)
 
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
