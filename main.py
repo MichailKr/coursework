@@ -1,3 +1,4 @@
+# main.py
 from graph import Graph
 from character import Character
 import ui_file
@@ -8,6 +9,7 @@ import time
 import queue
 from collections import deque
 import os
+
 # Импорт функций для таблицы лидеров
 from leaderboard import load_leaderboard, add_score_to_leaderboard
 
@@ -111,13 +113,11 @@ def draw_position(screen, side_length, border_width, current_point, colour, offs
 	pygame.draw.rect(screen, colour, [offset_x + border_width+(side_length+border_width)*current_point[0],\
 					 border_width+(side_length+border_width)*current_point[1], side_length, side_length])
 
-
 def draw_coin(screen, coin_image, current_point, side_length, border_width, offset_x, scale_factor=2):
     # Масштабируем изображение
     new_width = int(coin_image.get_width() * scale_factor)
     new_height = int(coin_image.get_height() * scale_factor)
     scaled_image = pygame.transform.scale(coin_image, (new_width, new_height))
-
     x = offset_x + border_width + (side_length + border_width) * current_point[0]
     y = border_width + (side_length + border_width) * current_point[1]
     # Центрируем изображение в клетке
@@ -255,14 +255,14 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 	# Defining colours (RGB) ...
 	BLACK = (0,0,0)
 	GRAY = (100,100,100)
-	WHITE = (111,22,125)
+	WHITE = (111,22,125) # Этот WHITE используется только локально, в UI файле есть свой.
 	GOLD = (249,166,2)
 	GREEN = (0,255,0)
 	RED = (255,0,0)
 	BLUE = (0,0,255)
 	COIN_COLOR = GOLD # Цвет монет
 	ACCELERATOR_COLOR = (0, 255, 255) # Цвет ускорителя (Cyan)
-	SLOWDOWN_COLOR = (255, 0, 255) # Цвет замедлителя (Magenta)Таблица
+	SLOWDOWN_COLOR = (255, 0, 255) # Цвет замедлителя (Magenta)
 	HUD_BG_COLOR = (30, 30, 30) # Цвет фона HUD панели
 
 	# set the grid size and side length of each grid
@@ -291,8 +291,8 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 	else:
 		# Если размер не меняется, просто обновляем screen_size
 		screen_size = current_window_size
-	# --- Конец Расчет размеров окна с HUD ---
 
+	# --- Конец Расчет размеров окна с HUD ---
 
 	# set the continue flag
 	carryOn = True
@@ -305,15 +305,13 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 
 	# initialize the grid for the maze
 	grid = create_grid(grid_size)
-
 	# create the maze using the grid - ИНИЦИАЛИЗИРУЕМ ДО УСЛОВИЙ РЕЖИМОВ
 	maze = create_maze(grid, (grid_size//2,grid_size//2)) # use the starting vertex to be middle of the map
-
 	# get all of the vertices in the maze
 	vertices = maze.get_vertices() # Теперь maze существует здесь
 
 	# draw the maze
-	draw_maze(screen, maze, grid_size, WHITE, side_length, border_width, offset_x) # Передаем offset_x
+	draw_maze(screen, maze, grid_size, (111,22,125), side_length, border_width, offset_x) # Передаем offset_x
 
 	# initialize starting point of character and potential character 2
 	start_point = (0,0)
@@ -346,81 +344,85 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 
 	# initialize the character
 	player1 = Character(screen, side_length, border_width, vertices,\
-						start_point, end_point, start_point, GREEN, WHITE)
+						start_point, end_point, start_point, GREEN, (111,22,125)) # Используем локальный WHITE
+
+	# Инициализируем computer_character только если режим не соло
+	computer_character = None
+	if mode in [2, 3, 4]:
+		# if computer race mode is selected
+		if mode == 2:
+			# initialize computer character
+			computer_character = Character(screen, side_length, border_width, vertices,\
+									 start_point2, end_point2, start_point2, GRAY, (111,22,125)) # Используем локальный WHITE
+			# find the shortest path for the computer to get to the end sing astar
+			path = astar.astar(start_point2, end_point2, maze)
+			# initialize a queue to pop in edges to solve
+			q = queue.Queue()
+			# add the paths the computer has to take to the queue
+			for edge in path:
+				q.put(edge)
+			# set the cooldown for how fast the computer moves (scales with maze size)
+			computer_cooldown = grid_size*15
+			# set the maximum cooldown for the computer
+			if computer_cooldown > 350:
+				computer_cooldown = 350
+			# initialize timer
+			computer_timer = pygame.time.get_ticks()
+		# if computer chase mode is selected
+		elif mode == 3:
+			# initialize computer character
+			computer_character = Character(screen, side_length, border_width, vertices,\
+									 start_point, end_point, start_point, GRAY, (111,22,125)) # Используем локальный WHITE
+			# create a deque for the paths to the player
+			dq = deque()
+			# put start_point for the deque
+			dq.append(start_point)
+			# set the cooldown for how fast the computer moves
+			computer_cooldown = grid_size*10
+			# set the maximum cooldown for the computer
+			if computer_cooldown > 300:
+				computer_cooldown = 300
+			# set the initial wait time for the computer
+			initial_wait = 3000
+			# initialize timers
+			computer_timer = pygame.time.get_ticks()
+			initial_wait_timer = pygame.time.get_ticks()
+		# if escape mode is selected
+		elif mode == 4:
+			# set random key points (from 1 to grid_size-2)
+			# 8 keys in total
+			x_coords = random.sample(range(1,grid_size-1),8)
+			y_coords = random.sample(range(1,grid_size-1),8)
+			# initialize empty key list
+			unlock_keys = []
+			# append coordinates to the key list
+			for i in range(8):
+					unlock_keys.append((x_coords[i],y_coords[i]))
+			# re-initialize character
+			player1 = Character(screen, side_length, border_width, vertices, start_point,\
+								end_point, start_point, GREEN, (111,22,125), True, unlock_keys, GOLD) # Используем локальный WHITE
+			# initialize computer character
+			computer_character = Character(screen, side_length, border_width, vertices,\
+									 start_point, end_point, start_point, GRAY, (111,22,125)) # Исправлено на border_width # Используем локальный WHITE
+			# create a deque for the paths to the player
+			dq = deque()
+			# put start_point for the deque
+			dq.append(start_point)
+			# set the cooldown for how fast the computer moves
+			computer_cooldown = grid_size*100
+			# set the maximum cooldown for the computer
+			if computer_cooldown > 3000:
+				computer_cooldown = 3000
+			# set the initial wait time for the computer
+			initial_wait = 3000
+			# initialize timers
+			computer_timer = pygame.time.get_ticks()
+			initial_wait_timer = pygame.time.get_ticks()
 
 	# if the two player game mode is selected, initialize the other character
 	if mode == 1:
 		player2 = Character(screen, side_length, border_width, vertices,\
-							start_point2, end_point2, start_point2, BLUE, WHITE)
-	# if computer race mode is selected
-	elif mode == 2:
-		# initialize computer character
-		computer_character = Character(screen, side_length, border_width, vertices,\
-								 start_point2, end_point2, start_point2, GRAY, WHITE)
-		# find the shortest path for the computer to get to the end sing astar
-		path = astar.astar(start_point2, end_point2, maze)
-		# initialize a queue to pop in edges to solve
-		q = queue.Queue()
-		# add the paths the computer has to take to the queue
-		for edge in path:
-			q.put(edge)
-		# set the cooldown for how fast the computer moves (scales with maze size)
-		computer_cooldown = grid_size*15
-		# set the maximum cooldown for the computer
-		if computer_cooldown > 350:
-			computer_cooldown = 350
-		# initialize timer
-		computer_timer = pygame.time.get_ticks()
-	# if computer chase mode is selected
-	elif mode == 3:
-		# initialize computer character
-		computer_character = Character(screen, side_length, border_width, vertices,\
-								 start_point, end_point, start_point, GRAY, WHITE)
-		# create a deque for the paths to the player
-		dq = deque()
-		# put start_point for the deque
-		dq.append(start_point)
-		# set the cooldown for how fast the computer moves
-		computer_cooldown = grid_size*10
-		# set the maximum cooldown for the computer
-		if computer_cooldown > 300:
-			computer_cooldown = 300
-		# set the initial wait time for the computer
-		initial_wait = 3000
-		# initialize timers
-		computer_timer = pygame.time.get_ticks()
-		initial_wait_timer = pygame.time.get_ticks()
-	# if escape mode is selected
-	elif mode == 4:
-		# set random key points (from 1 to grid_size-2)
-		# 8 keys in total
-		x_coords = random.sample(range(1,grid_size-1),8)
-		y_coords = random.sample(range(1,grid_size-1),8)
-		# initialize empty key list
-		unlock_keys = []
-		# append coordinates to the key list
-		for i in range(8):
-				unlock_keys.append((x_coords[i],y_coords[i]))
-		# re-initialize character
-		player1 = Character(screen, side_length, border_width, vertices, start_point,\
-							end_point, start_point, GREEN, WHITE, True, unlock_keys, GOLD)
-		# initialize computer character
-		computer_character = Character(screen, side_length, border_width, vertices,\
-								 start_point, end_point, start_point, GRAY, WHITE) # Исправлено на border_width
-		# create a deque for the paths to the player
-		dq = deque()
-		# put start_point for the deque
-		dq.append(start_point)
-		# set the cooldown for how fast the computer moves
-		computer_cooldown = grid_size*100
-		# set the maximum cooldown for the computer
-		if computer_cooldown > 3000:
-			computer_cooldown = 3000
-		# set the initial wait time for the computer
-		initial_wait = 3000
-		# initialize timers
-		computer_timer = pygame.time.get_ticks()
-		initial_wait_timer = pygame.time.get_ticks()
+							start_point2, end_point2, start_point2, BLUE, (111,22,125)) # Используем локальный WHITE
 
 
 	# --- Монеты ---
@@ -459,12 +461,11 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 	# Выбираем случайные позиции для замедлителей
 	slowdown_positions = random.sample(available_item_positions, min(num_slowdowns, len(available_item_positions)))
 
-
 	# Значения изменения времени (в секундах)
 	ACCELERATOR_VALUE = 5 # Уменьшает время на 5 секунд
 	SLOWDOWN_VALUE = 5 # Увеличивает время на 5 секунд
-	# --- Конец Подбираемые элементы времени ---
 
+	# --- Конец Подбираемые элементы времени ---
 
 	# draw the end-point
 	draw_position(screen, side_length, border_width, end_point, RED, offset_x) # Передаем offset_x
@@ -473,21 +474,17 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 	if mode == 1:
 		draw_position(screen, side_length, border_width, end_point, GREEN, offset_x) # Передаем offset_x
 		draw_position(screen, side_length, border_width, end_point2, BLUE, offset_x) # Передаем offset_x
-
 	# if computer mode, draw gray endpoint for computer
 	elif mode == 2:
 		draw_position(screen, side_length, border_width, end_point, GREEN, offset_x) # Передаем offset_x
 		draw_position(screen, side_length, border_width, end_point2, GRAY, offset_x) # Передаем offset_x
-
 	# if escape mode, draw keys
 	elif mode == 4:
 		# player1.draw_keys() # Отрисовка ключей теперь происходит в основном цикле
 		# update console
-		update_console(screen, screen_size, side_length, screen_size[0]//grid_size, WHITE, BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x
-
+		update_console(screen, screen_size, side_length, screen_size[0]//grid_size, (255,255,255), BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x # Используем локальный WHITE
 	# update the screen
 	pygame.display.flip()
-
 	# set cooldown for key presses
 	cooldown = 100
 	# initialize the cooldown timer
@@ -495,7 +492,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 	# if the two player game mode is selected, initialize the cooldown timer for second player
 	if mode == 1:
 		start_timer2 = pygame.time.get_ticks()
-
 	# initialize game timer for solo mode
 	# game_start_time = 0 # Больше не нужен в этой роли
 	elapsed_time = 0.0 # Время, прошедшее с начала игры (используем float для точности)
@@ -522,7 +518,6 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 			last_time = current_time # Обновляем время последнего обновления
 		# --- Конец Обновление таймера ---
 
-
 		# get the pressed keys
 		keys = pygame.key.get_pressed()
 
@@ -539,7 +534,7 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 		# Проверяем сбор замедлителей
 		if player1_pos in slowdown_positions:
 			elapsed_time += SLOWDOWN_VALUE # Увеличиваем время
-			slowdown_positions.remove(player1_pos)
+			slowdown_positions.remove(player1_pos) # Исправлено: удаляем позицию игрока
 
 		# Логика сбора для Player 2, если существует (не влияет на таймер в Solo режиме)
 		if mode == 1:
@@ -552,16 +547,14 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 			# if player2_pos in slowdown_positions: ...
 
 		# Логика сбора для компьютера, если существует (опционально, не влияет на таймер в Solo режиме)
-		if mode == 2 or mode == 3 or mode == 4:
+		if mode in [2, 3, 4] and computer_character: # Проверяем, что computer_character существует
 			computer_pos = computer_character.get_current_position()
 			if computer_pos in coin_positions:
 				coin_positions.remove(computer_pos)
 			# Можно добавить сбор предметов времени для компьютера (без эффекта на его "время")
 			# if computer_pos in accelerator_positions: ...
 			# if computer_pos in slowdown_positions: ...
-
 		# --- Конец Сбор монет и предметов времени ---
-
 
 		if (pygame.time.get_ticks() - start_timer > cooldown):
 			# get the current point of character
@@ -574,15 +567,16 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 					# check if the next point is connected by an edge
 					if (maze.is_edge((current_point,next_point))):
 						player1.move_character_smooth(next_point,5)
-						# if the current mode is chase mode or escape mode
-						if mode == 3:
-							# update the shortest path for the computer to use
-							dq = update_path(next_point, dq)
-						elif mode == 4:
-							dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+						# if the current mode is chase mode or escape mode and computer_character exists
+						if mode in [3, 4] and computer_character:
+							if mode == 3:
+								# update the shortest path for the computer to use
+								dq = update_path(next_point, dq)
+							elif mode == 4:
+								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
 					else:
-						# if it is escape mode
-						if mode == 4:
+						# if it is escape mode and computer_character exists
+						if mode == 4 and computer_character:
 							# if the player pressed the space key, break the wall in the direction they are moving in
 							if keys[pygame.K_SPACE] and player1.get_wallBreaks() > 0:
 								maze = break_wall(maze, current_point, next_point)
@@ -600,14 +594,15 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 					next_point = (current_point[0]-1, current_point[1])
 					if (maze.is_edge((current_point,next_point))):
 						player1.move_character_smooth(next_point,5)
-						# if the current mode is chase mode or escape mode
-						if mode == 3:
-							dq = update_path(next_point, dq)
-						elif mode == 4:
-							dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+						# if the current mode is chase mode or escape mode and computer_character exists
+						if mode in [3, 4] and computer_character:
+							if mode == 3:
+								dq = update_path(next_point, dq)
+							elif mode == 4:
+								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
 					else:
-						# if it is escape mode
-						if mode == 4:
+						# if it is escape mode and computer_character exists
+						if mode == 4 and computer_character:
 							# if the player pressed the space key, break the wall in the direction they are moving in
 							if keys[pygame.K_SPACE] and player1.get_wallBreaks() > 0:
 								maze = break_wall(maze, current_point, next_point)
@@ -617,6 +612,7 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 								player1.use_wallBreak()
 								# update the shortest path for the computer to use
 								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+
 				# restart cooldown timer
 				start_timer = pygame.time.get_ticks()
 			# move character up
@@ -625,14 +621,16 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 					next_point = (current_point[0], current_point[1]-1)
 					if (maze.is_edge((current_point,next_point))):
 						player1.move_character_smooth(next_point,5)
-						# if the current mode is chase mode or escape mode
-						if mode == 3:
-							dq = update_path(next_point, dq)
-						elif mode == 4:
-							dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+						# if the current mode is chase mode or escape mode and computer_character exists
+						if mode in [3, 4] and computer_character:
+							if mode == 3:
+								dq = update_path(next_point, dq)
+							elif mode == 4:
+								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+
 					else:
-						# if it is escape mode
-						if mode == 4:
+						# if it is escape mode and computer_character exists
+						if mode == 4 and computer_character:
 							# if the player pressed the space key, break the wall in the direction they are moving in
 							if keys[pygame.K_SPACE] and player1.get_wallBreaks() > 0:
 								maze = break_wall(maze, current_point, next_point)
@@ -642,6 +640,7 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 								player1.use_wallBreak()
 								# update the shortest path for the computer to use
 								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+
 				# restart cooldown timer
 				start_timer = pygame.time.get_ticks()
 			# move character down
@@ -650,14 +649,16 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 					next_point = (current_point[0], current_point[1]+1)
 					if (maze.is_edge((current_point,next_point))):
 						player1.move_character_smooth(next_point,5)
-						# if the current mode is chase mode or escape mode
-						if mode == 3:
-							dq = update_path(next_point, dq)
-						elif mode == 4:
-							dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+						# if the current mode is chase mode or escape mode and computer_character exists
+						if mode in [3, 4] and computer_character:
+							if mode == 3:
+								dq = update_path(next_point, dq)
+							elif mode == 4:
+								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+
 					else:
-						# if it is escape mode
-						if mode == 4:
+						# if it is escape mode and computer_character exists
+						if mode == 4 and computer_character:
 							# if the player pressed the space key, break the wall in the direction they are moving in
 							if keys[pygame.K_SPACE] and player1.get_wallBreaks() > 0:
 								maze = break_wall(maze, current_point, next_point)
@@ -667,43 +668,46 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 								player1.use_wallBreak()
 								# update the shortest path for the computer to use
 								dq = update_path_a(computer_character.get_current_position(), next_point, maze, dq)
+
 				# restart cooldown timer
 				start_timer = pygame.time.get_ticks()
-
 
 		# PLAYER 2 MOVEMENT HERE (if gamemode selected)
 		if mode == 1:
 			# update the start timer for player 2
 			start_timer2 = playerTwo(player2, maze, vertices, cooldown, start_timer2)
 
-
 		# computer movement for race mode
-		elif mode == 2:
+		elif mode == 2 and computer_character: # Проверяем, что computer_character существует
 			if (pygame.time.get_ticks() - computer_timer > computer_cooldown):
-				computer_character.move_character_smooth(q.get(),5)
-				# reset the cooldown timer for computer
-				computer_timer = pygame.time.get_ticks()
+				# Проверяем, что очередь не пуста перед получением элемента
+				if not q.empty():
+					computer_character.move_character_smooth(q.get(),5)
+					# reset the cooldown timer for computer
+					computer_timer = pygame.time.get_ticks()
+				else:
+					# Если очередь пуста, компьютер достиг цели или застрял
+					pass # Можно добавить какую-то обработку
 
 
 		# computer movement for chase mode and escape mode
-		elif mode == 3 or mode == 4:
+		elif mode in [3, 4] and computer_character: # Проверяем, что computer_character существует
 			if mode == 4:
 				# increase the computer speed if got another 2 keys
 				# Эта логика должна быть в runGame после сбора ключей
 				# if player1.increase_computer_speed(): # Вызов из character.increase_computer_speed
 				#	 computer_cooldown = computer_cooldown/2
 				# --- Логика увеличения скорости компьютера при сборе ключей ---
-				if player1.escape and player1.keys is not None:
-					# Предполагая, что collected_keys обновляется в Character
-					# Или нужно обновить collected_keys здесь после сбора ключа
-					pass # Логика должна быть при сборе ключа
+				# Эта логика лучше должна быть в Character.collect_key()
+				pass
 				# --- Конец Логика увеличения скорости компьютера при сборе ключей ---
 
 				# update console
-				update_console(screen, screen_size, side_length, screen_size[0]//grid_size, WHITE, BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x
+				update_console(screen, screen_size, side_length, screen_size[0]//grid_size, (255,255,255), BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x # Используем локальный WHITE
 
 			# update the wait condition
 			waitCondition = pygame.time.get_ticks() - initial_wait_timer > initial_wait
+
 			# check if the wait condition is met
 			if (waitCondition):
 				if (pygame.time.get_ticks() - computer_timer > computer_cooldown):
@@ -713,17 +717,16 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 					# reset the cooldown timer for computer
 					computer_timer = pygame.time.get_ticks()
 
-
 		# --- Отрисовка всех элементов ---
 		# Перерисовываем фон (включая область HUD)
 		screen.fill(BLACK)
+
 		# Заливаем фон HUD панели
 		hud_rect = pygame.Rect(0, 0, hud_width, game_screen_height)
 		pygame.draw.rect(screen, HUD_BG_COLOR, hud_rect)
 
-
 		# Отрисовываем лабиринт
-		draw_maze(screen, maze, grid_size, WHITE, side_length, border_width, offset_x) # Передаем offset_x
+		draw_maze(screen, maze, grid_size, (111,22,125), side_length, border_width, offset_x) # Передаем offset_x
 
 		# Отрисовываем оставшиеся монеты
 		for coin_pos in coin_positions:
@@ -736,8 +739,10 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 		# Отрисовываем оставшиеся замедлители
 		for slow_pos in slowdown_positions:
 			draw_coin(screen, slow_image, slow_pos, side_length, border_width, offset_x)
+
 		# Отрисовка персонажей и конечных точек (после всех предметов)
 		draw_position(screen, side_length, border_width, end_point, RED, offset_x) # Передаем offset_x
+
 		if mode == 1:
 			draw_position(screen, side_length, border_width, end_point, GREEN, offset_x) # Передаем offset_x
 			draw_position(screen, side_length, border_width, end_point2, BLUE, offset_x) # Передаем offset_x
@@ -745,110 +750,103 @@ def runGame(screen, screen_size, grid_size, side_length, mode): # Теперь �
 		elif mode == 2:
 			draw_position(screen, side_length, border_width, end_point, GREEN, offset_x) # Передаем offset_x
 			draw_position(screen, side_length, border_width, end_point2, GRAY, offset_x) # Передаем offset_x
-			computer_character.draw_position(offset_x) # Передаем offset_x при отрисовке компьютера
-		elif mode == 3 or mode == 4:
+			if computer_character: # Проверяем, что computer_character существует перед отрисовкой
+				computer_character.draw_position(offset_x) # Передаем offset_x при отрисовке компьютера
+		elif mode in [3, 4]:
 			if mode == 4:
 				player1.draw_keys(offset_x) # Передаем offset_x при отрисовке ключей
 				if player1.collected_all(): # Проверяем разблокировку выхода
 					draw_position(screen, side_length, border_width, end_point, GREEN, offset_x) # Передаем offset_x
 				else:
 					draw_position(screen, side_length, border_width, end_point, RED, offset_x) # Передаем offset_x
+
 				# update console
-				update_console(screen, screen_size, side_length, screen_size[0]//grid_size, WHITE, BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x
+				update_console(screen, screen_size, side_length, screen_size[0]//grid_size, (255,255,255), BLACK, player1.get_keys_left(), player1.get_wallBreaks(), offset_x) # Передаем offset_x
 
-
-			if waitCondition:
+			if mode in [3, 4] and computer_character and waitCondition: # Проверяем, что computer_character существует и waitCondition выполнено
 				computer_character.draw_position(offset_x) # Передаем offset_x при отрисовке компьютера, если он активен
 
 		player1.draw_position(offset_x) # Передаем offset_x при отрисовке игрока
-		# --- Конец Отрисовка всех элементов ---
-
 
 		# --- Отрисовка HUD панели (таймер и монеты) ---
 		# Область HUD панели уже залита черным фоном
+
 		# Текст с количеством монет
 		coin_text = f"Монеты: {player1.get_coins()}"
 		font_size_coins = hud_width // 8 # Размер шрифта для монет пропорционально ширине HUD
 		font_coins = pygame.font.SysFont("ubuntu", font_size_coins)
 		text_surface_coins = font_coins.render(coin_text, True, GOLD) # Цвет текста монет
 		text_rect_coins = text_surface_coins.get_rect(midtop=(hud_width // 2, 20)) # Позиция в середине HUD, небольшой отступ сверху
-
 		screen.blit(text_surface_coins, text_rect_coins)
-
 
 		# Текст с таймером (только в Solo режиме)
 		if mode == 0:
 			timer_text = f"Время: {elapsed_time:.2f} сек" # Отображаем время с двумя знаками после запятой
 			font_size_timer = hud_width // 7 # Размер шрифта для таймера (чуть больше)
 			font_timer = pygame.font.SysFont("ubuntu", font_size_timer)
-			text_surface_timer = font_timer.render(timer_text, True, WHITE) # Цвет текста таймера
+			text_surface_timer = font_timer.render(timer_text, True, (255,255,255)) # Цвет текста таймера
 			text_rect_timer = text_surface_timer.get_rect(midtop=(hud_width // 2, 70)) # Позиция ниже монет
-
 			screen.blit(text_surface_timer, text_rect_timer)
 
 		# --- Конец Отрисовка HUD панели ---
 
-
 		# Обновляем весь экран в конце цикла
 		pygame.display.flip()
-
 
 		# win conditions for the different modes
 		if mode == 0:
 			if player1.reached_goal():
 				carryOn = False
+				final_time = elapsed_time
+				return mode, final_time, player1.get_coins() # Возвращаем final_time и монеты для соло режима
+			# Убираем условие поражения с computer_character из соло режима
+			# if mode == 0 and computer_character.get_current_position() == player1.get_current_position() and waitCondition:
+			# 	carryOn = False
+			# 	return mode, None, 0 # Возвращаем None для времени и 0 монет при поражении
 
 		elif mode == 1:
 			if player1.reached_goal():
 				winner = 1
 				carryOn = False
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
 			elif player2.reached_goal():
 				winner = 2
 				carryOn = False
-
-		elif mode == 2:
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
+		elif mode == 2 and computer_character: # Проверяем, что computer_character существует
 			if player1.reached_goal():
 				winner = 1
 				carryOn = False
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
 			elif computer_character.reached_goal():
 				winner = 2
 				carryOn = False
-
-		elif mode == 3:
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
+		elif mode == 3 and computer_character: # Проверяем, что computer_character существует
 			if player1.reached_goal():
 				winner = 1
 				carryOn = False
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
 			elif computer_character.get_current_position() == player1.get_current_position() and waitCondition:
 				winner = 2
 				carryOn = False
-
-		elif mode == 4:
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
+		elif mode == 4 and computer_character: # Проверяем, что computer_character существует
 			if player1.escaped():
 				winner = 1
 				carryOn = False
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
 			elif computer_character.get_current_position() == player1.get_current_position() and waitCondition:
 				winner = 2
 				carryOn = False
+				return mode, winner, 0 # Возвращаем 0 монет для других режимов
 
 
 		# limit to 60 frames per second (fps)
 		clock.tick(60) # Ограничиваем FPS для стабильности
 
-	# stop the game engine once exited the game
-	# pygame.quit() # Не вызываем здесь, закрываем в main
-
-	# solo mode
-	if mode == 0:
-		# При завершении игры в соло режиме возвращаем elapsed_time
-		final_time = elapsed_time
-		# Добавляем результат в таблицу лидеров: время и монеты
-		add_score_to_leaderboard(final_time, player1.get_coins(), "Solo Player") # Передаем количество монет
-		# Возвращаем режим и время
-		return mode, final_time # Возвращаем final_time
-	# other modes
-	else:
-		# Возвращаем режим и победителя
-		return mode, winner
+	# Если цикл завершился не по условию победы/поражения (например, Esc), возвращаем режим -1
+	return mode, None, 0 # Возвращаем None для результата и 0 монет при выходе по Esc
 
 # main function
 if __name__ == "__main__":
@@ -859,11 +857,12 @@ if __name__ == "__main__":
 	set_window_position(50,50)
 
 	# initialize states
-	states = {0:"Main Menu", 1:"Gameplay", 2:"Leaderboard", 3:"End Game"} # Добавили состояние для экрана окончания игры
+	states = {0:"Main Menu", 1:"Gameplay", 2:"Leaderboard", 3:"End Game", 4:"Input Name"} # Добавили состояние для ввода имени
 	current_state = states[0]
+
 	# initialize variables
 	grid_size = 20 # Дефольные значения
-	side_length = 10 # Дефольные значения
+	side_length = 22 # Дефольные значения, как в ui_file
 	mode = 0 # Дефольный режим
 
 	# Флаг для главного цикла
@@ -875,39 +874,61 @@ if __name__ == "__main__":
 	fon = load_background(screen)
 	screen.blit(fon, (0, 0))
 
+	# Переменные для хранения информации о конце игры и введенного имени
+	end_game_data = None # (mode, result, coins) - result будет time для соло победы, winner для других режимов, None для поражения/выхода
+	player_name_input = ""
+
 	while Run:
 		if current_state == states[0]: # Главное меню
 			# startScreen теперь возвращает Run, grid_size, side_length, mode, next_state
-			Run, grid_size, side_length, mode, next_state = ui_file.startScreen(screen, screen_size) # Передаем screen и screen_size
+			Run, grid_size, side_length, mode, next_state = ui_file.startScreen(screen, screen_size)
 			if next_state != -1: # Если это не выход из игры
 				current_state = states[next_state] # Переходим в следующее состояние
 			else:
 				Run = False # Выходим из главного цикла
 
 		elif current_state == states[1]: # Состояние игры
-			# runGame сам устанавливает размер окна, но он должен использовать переданную поверхность
-			# В Solo режиме runGame вернет final_time, в других режимах - winner
-			game_result = runGame(screen, screen_size, grid_size, side_length, mode) # Передаем screen, screen_size, grid_size, side_length, mode
-			# После игры переходим в состояние окончания игры
-			current_state = states[3]
-			end_game_info = (mode, game_result[1]) # Сохраняем информацию для endGame (режим и результат - время или победитель)
+			# runGame возвращает режим, результат (время или победитель) и монеты (0 для не-соло)
+			game_result = runGame(screen, screen_size, grid_size, side_length, mode)
+			end_game_data = game_result # Сохраняем режим, результат и монеты
+
+			if end_game_data[0] == 0 and end_game_data[1] is not None: # Если соло режим и игра завершилась победой (есть время)
+				current_state = states[4] # Переходим в состояние ввода имени
+			elif end_game_data[0] != -1: # Для других режимов или если игра завершилась (не выход по Esc из runGame)
+				current_state = states[3] # Просто показываем экран конца игры (или поражения в соло, где result = None)
+			else: # Если режим -1 (выход из игры по Esc из runGame)
+				Run = False
+
 
 		elif current_state == states[2]: # Состояние таблицы лидеров
 			# Перед показом таблицы лидеров убедимся, что размер окна соответствует меню
 			pygame.display.set_mode(screen_size)
-			next_state = ui_file.leaderboardScreen(screen, screen_size) # Передаем screen и screen_size
+			next_state = ui_file.leaderboardScreen(screen, screen_size)
 			if next_state == -1: # Если leaderboardScreen вернул -1 (сигнал выхода)
 				Run = False # Завершаем главный цикл
 			else:
 				current_state = states[next_state] # Иначе переходим в состояние, которое вернула leaderboardScreen (0 - главное меню)
 
-		elif current_state == states[3]: # Состояние окончания игры
+		elif current_state == states[3]: # Состояние окончания игры (для режимов кроме соло победы и для соло поражения/выхода)
 			# Перед показом экрана окончания игры убедимся, что размер окна соответствует меню
 			pygame.display.set_mode(screen_size)
 			# Передаем режим и результат (время или победитель)
-			ui_file.endGame(end_game_info[0], end_game_info[1]) # Вызываем endGame с сохраненными данными
+			# ui_file.endGame обрабатывает случаи, когда result is None (например, при поражении в соло или выходе по Esc из игры)
+			ui_file.endGame(end_game_data[0], end_game_data[1])
 			current_state = states[0] # После экрана окончания игры возвращаемся в главное меню
 
+		elif current_state == states[4]: # Состояние ввода имени игрока (только для соло режима после победы)
+			pygame.display.set_mode(screen_size) # Убедимся, что размер окна для ввода имени соответствует меню
+			# Передаем время и монеты из end_game_data
+			# getInputNameScreen возвращает введенное имя или пустую строку при отмене/закрытии
+			player_name_input = ui_file.getInputNameScreen(screen, screen_size, end_game_data[1], end_game_data[2])
+
+			# Проверяем, что имя было введено (не пустая строка) И результат игры корректен (не None)
+			if player_name_input and end_game_data[1] is not None:
+				# Сохраняем счет с введенным именем
+				add_score_to_leaderboard(end_game_data[1], end_game_data[2], player_name_input)
+
+			current_state = states[0] # Возвращаемся в главное меню после ввода имени/отмены/сохранения
 
 	# Закрываем Pygame один раз при полном выходе
 	pygame.quit()
