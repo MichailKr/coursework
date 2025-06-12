@@ -149,16 +149,13 @@ class Shop:
 
     def buy_item(self, shop_item):
         """Покупка предмета"""
-        # Проверяем, есть ли у игрока деньги (добавьте систему денег в игру)
-        # Пока что просто добавляем предмет в инвентарь
-        if hasattr(self.game_manager.player, 'add_item_to_inventory'):
-            success = self.game_manager.player.add_item_to_inventory(shop_item.item)
-            if success:
-                print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
-            else:
-                print("Инвентарь полон!")
+        player = self.game_manager.player
+        if player.coins >= shop_item.buy_price:
+            player.remove_coins(shop_item.buy_price)
+            player.add_item_to_inventory(shop_item.item)
+            print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
         else:
-            print("Ошибка: У игрока нет метода добавления предметов в инвентарь")
+            print("Недостаточно монет!")
 
     def sell_item(self, item):
         """Продажа предмета"""

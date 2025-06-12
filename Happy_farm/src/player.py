@@ -7,6 +7,9 @@ from src.game_state import GameState # Импортируем GameState, есл�
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_manager, x, y, speed=100):
         super().__init__()
+        self.coins = 1000
+        self.hotbar_slots = [None] * 5
+        self.inventory = [[] for _ in range(3)]
         self.game = game_manager # Ссылка на GameManager
 
         # Пути к спрайтам
@@ -52,6 +55,46 @@ class Player(pygame.sprite.Sprite):
         self.update_collision_rect()  # Обновляем позицию коллизии
 
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")
+
+
+    def add_coins(self, amount):
+        self.coins += amount
+    
+
+    def remove_coins(self, amount):
+        if self.coins >= amount:
+            self.coins -= amount
+        else:
+            print("Недостаточно монет!")
+
+
+    def draw_coins(self, screen):
+        font = self.game.fonts['small']
+        text = font.render(f"Coins: {self.coins}", True, (255, 255, 255))
+        screen.blit(text, (5, 35,5,5))
+
+    def add_item_to_inventory(self, item, slot_index=None):
+        """Добавляет предмет в инвентарь или хотбар"""
+        if slot_index is not None and 0 <= slot_index < len(self.hotbar_slots):
+            # Добавляем в хотбар
+            self.hotbar_slots[slot_index] = item
+            return True
+        elif self._find_empty_slot():
+            # Добавляем в основной инвентарь
+            row, col = self._find_empty_slot()
+            self.inventory[row][col] = item
+            return True
+        else:
+            print("Инвентарь полон!")
+            return False
+
+    def _find_empty_slot(self):
+        """Ищет первый пустой слот в инвентаре"""
+        for row in range(len(self.inventory)):
+            for col in range(len(self.inventory[row])):
+                if self.inventory[row][col] is None:
+                    return row, col
+        return None
 
     def load_animations(self):
         """Загрузка всех анимаций игрока"""

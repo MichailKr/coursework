@@ -332,6 +332,7 @@ class GameManager:
         Включает обработку общих событий, инвентаря и взаимодействия с магазином.
         """
         events = pygame.event.get()
+        keys = pygame.key.get_pressed()  # Получаем состояние клавиш
 
         for event in events:
             if event.type == pygame.QUIT:
@@ -342,23 +343,27 @@ class GameManager:
                 self.running = False
                 return False
 
-            # --- Передаем событие игроку для обработки его специфического ввода (использование предметов) ---
-            if hasattr(self, 'player') and self.player: # Убедитесь, что игрок существует
-                 self.player.handle_input(event)
-            # --- Конец передачи игроку ---
+            # --- Передача события игроку ---
+            if hasattr(self, 'player') and self.player:
+                self.player.handle_input(event)
 
-            # Обработка клавиши взаимодействия (E) - пример взаимодействия, которое может быть в GameManager
+            # --- Передача события инвентарю ---
+            self.inventory_manager.handle_input(event)
+
+            # --- Обработка взаимодействия с магазином ---
             if event.type == pygame.KEYDOWN:
                 if event.key == self.settings['controls']['interact']:
                     if hasattr(self, 'shop') and isinstance(self.shop, Shop):
-                         # Убедитесь, что инвентарь закрыт при взаимодействии с магазином
-                         if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                        # Убедитесь, что инвентарь закрыт при взаимодействии с магазином
+                        if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
                             self.shop.toggle_shop()
                             print("Магазин открыт/закрыт")
-                         elif self.inventory_manager.inventory_open and self.shop.is_open: # Если инвентарь открыт и магазин открыт, может быть другая логика
-                             pass # Например, взаимодействие с инвентарем магазина
+                        elif self.inventory_manager.inventory_open and self.shop.is_open:
+                            pass  # Можно добавить логику для инвентаря магазина
 
-            self.inventory_manager.handle_input(event)
+        # Вызов handle_input для магазина (если он открыт)
+        if hasattr(self, 'shop') and self.shop.is_open:
+            self.shop.handle_input(keys, events)
 
         return True
 
@@ -403,6 +408,7 @@ class GameManager:
             self.inventory_manager.draw(screen)
             # --- Конец блока добавления ---
             self.shop.draw(screen)
+            self.player.draw_coins(screen)
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
             screen.blit(fps_text, (10, 10))
