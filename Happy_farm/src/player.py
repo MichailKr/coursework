@@ -41,14 +41,14 @@ class Player(pygame.sprite.Sprite):
              self.image = self.animations[self.direction][0]
         else:
              print(f"Предупреждение: Начальная анимация для направления '{self.direction}' пуста или не существует. Используется заглушка.")
-             dummy = pygame.Surface((32, 32))
+             dummy = pygame.Surface((16, 16))
              dummy.fill((0, 255, 0))
              self.image = dummy
 
         self.rect = self.image.get_rect(topleft=(x, y))
 
         # Создаем отдельный прямоугольник для коллизий
-        self.collision_rect = pygame.Rect(0, 0, 12, 12) # Размер коллизии (настройте по необходимости)
+        self.collision_rect = pygame.Rect(0, 0, 6, 6) # Размер коллизии (настройте по необходимости)
         self.update_collision_rect()  # Обновляем позицию коллизии
 
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")

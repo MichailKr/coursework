@@ -1,9 +1,10 @@
 import pygame
-from src.item import Item # Убедитесь, что путь к Item правильный
+from src.item import Item, Tool # Убедитесь, что путь к Item и Tool правильный
 
 class InventoryManager:
     def __init__(self, game_manager):
         self.game_manager = game_manager  # Ссылка на GameManager для доступа к другим частям игры
+
         self.inventory_open = False
         self.selected_item_index = 0 # Индекс выбранного слота в хотбаре
         self.hotbar_slots = [None] * 8 # Список для хотбара (8 слотов)
@@ -11,18 +12,19 @@ class InventoryManager:
 
         # Перетаскивание предметов
         self.dragging_item = None
-        self.drag_start_slot = None
+        self.drag_start_slot = None # Содержит ('hotbar', index) или ('inventory', row, col)
         self.drag_offset = (0, 0)
 
         # Размеры и позиции для отрисовки (можно вынести в константы или получать из GameManager)
         self.hotbar_slot_size = 50
         self.hotbar_slot_padding = 10
         self.hotbar_panel_padding = 10
+
         self.inventory_slot_size = 60
         self.inventory_slot_padding = 10
-        self.inventory_panel_padding = 10
         self.inventory_cols = 3
         self.inventory_rows = 6
+        self.inventory_panel_padding = 10 # Добавлена константа для отступа панели инвентаря
 
     def add_item_to_inventory(self, item, slot_index=None, row=None, col=None):
         """
@@ -63,79 +65,99 @@ class InventoryManager:
                         self.inventory[r][c] = item
                         print(f"Предмет {item.name} добавлен в инвентарь слот ({r}, {c})")
                         return True
-            # Поиск свободного слота в хотбаре
+            # Поиск свободного слота в хотбаре (после основного инвентаря)
             for i in range(len(self.hotbar_slots)):
                 if self.hotbar_slots[i] is None:
                     self.hotbar_slots[i] = item
                     print(f"Предмет {item.name} добавлен в хотбар слот {i}")
                     return True
 
+
         print(f"Не удалось добавить предмет {item.name}: нет свободных слотов.")
         return False
 
     def handle_input(self, event):
         """Обработка событий ввода, связанных с инвентарем (открытие/закрытие, выбор слота, перетаскивание)"""
+
+        # --- Отладочные принты для проверки принимаемых событий ---
+        # print(f"InventoryManager received event type: {event.type}")
+        # if event.type == pygame.KEYDOWN:
+        #     print(f"Key pressed: {event.key}")
+        #     print(f"Expected inventory key: {self.game_manager.settings['controls']['inventory']}")
+        # elif event.type == pygame.MOUSEBUTTONDOWN:
+        #      print(f"Mouse button down at {event.pos}, button: {event.button}")
+        # elif event.type == pygame.MOUSEBUTTONUP:
+        #      print(f"Mouse button up at {event.pos}, button: {event.button}")
+        # elif event.type == pygame.MOUSEMOTION:
+        #      print(f"Mouse motion to {event.pos}")
+        # --- Конец отладочных принтов ---
+
+
         if event.type == pygame.KEYDOWN:
-            # Обработка открытия/закрытия инвентаря клавишей T
-            if event.key == self.game_manager.settings['controls']['inventory']: # Например, pygame.K_i
+            # Обработка открытия/закрытия инвентаря клавишей
+            if event.key == self.game_manager.settings['controls']['inventory']:
                 self.inventory_open = not self.inventory_open
-                print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}")
+                # print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}") # Отладочный принт
 
             # Обработка выбора слота хотбара клавишами 1-8 (если инвентарь закрыт)
+            # Этот блок у вас уже работает
             if not self.inventory_open:
                 for i in range(8):
                     if event.key == getattr(pygame, f'K_{i + 1}'):
                         self.selected_item_index = i
-                        print(f"Выбран слот хотбара: {self.selected_item_index}")
-                        break # Выходим после обработки нажатия 1-8
+                        # print(f"Выбран слот хотбара: {self.selected_item_index}") # Отладочный принт
+                        break
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Левая кнопка мыши
                 mouse_pos = event.pos
+                # Проверяем клик только если инвентарь открыт (для перетаскивания)
                 if self.inventory_open:
-                    # Проверяем клик по слотам инвентаря для начала перетаскивания
                     item, slot_info = self.get_item_from_click(mouse_pos)
                     if item:
                         self.dragging_item = item
                         self.drag_start_slot = slot_info
-                        # Рассчитываем смещение для плавного перетаскивания
                         item_image_rect = self.get_item_image_rect(item, slot_info)
                         if item_image_rect:
                             self.drag_offset = (mouse_pos[0] - item_image_rect.x, mouse_pos[1] - item_image_rect.y)
                         else:
                             self.drag_offset = (0, 0)
-                        # Временно убираем предмет из исходного слота
                         self._remove_item_from_slot(slot_info)
-
+                        # print(f"Начато перетаскивание предмета {item.name} из {slot_info}") # Отладочный принт
+                # TODO: Добавить здесь обработку кликов вне инвентаря (для использования предмета в мире),
+                # если эта логика не в Player.handle_input
 
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:  # Левая кнопка мыши
                 if self.dragging_item:
                     mouse_pos = event.pos
-                    # Определяем, куда бросили предмет
                     target_slot_info = self.get_slot_from_click(mouse_pos)
 
                     if target_slot_info:
-                        # Попытка поместить предмет в новый слот
+                        # print(f"Предмет {self.dragging_item.name} брошен в {target_slot_info}") # Отладочный принт
                         success = self.place_item_in_slot(self.dragging_item, target_slot_info, self.drag_start_slot)
                         if not success:
-                            # Если не удалось поместить, вернуть в исходный слот
-                            self.place_item_in_slot(self.dragging_item, self.drag_start_slot)
+                            # print(f"Не удалось поместить предмет {self.dragging_item.name} в {target_slot_info}. Возврат в исходный слот {self.drag_start_slot}.") # Отладочный принт
+                            self.place_item_in_slot(self.dragging_item, self.drag_start_slot) # Вернуть в исходный слот
                     else:
                         # Предмет брошен вне инвентаря (логика выброса)
                         print(f"Предмет {self.dragging_item.name} выброшен.")
                         # Здесь можно добавить логику для создания объекта Item на земле
-                        pass
 
                     self.dragging_item = None
                     self.drag_start_slot = None
                     self.drag_offset = (0, 0)
+                # TODO: Добавить здесь обработку отпускания кликов вне инвентаря
 
-        # Обработка движения мыши только для обновления позиции перетаскиваемого предмета
-        if event.type == pygame.MOUSEMOTION:
+        elif event.type == pygame.MOUSEMOTION:
+             # --- Раскомментированный блок для обработки движения мыши ---
              if self.dragging_item:
+                 # Позиция перетаскиваемого предмета обновляется при отрисовке.
+                 # Здесь можно добавить логику для проверки наведения на слоты,
+                 # если хотите визуально подсвечивать целевой слот.
                  pass
-                 # Позиция будет обновляться при отрисовке
+             # --- Конец раскомментированного блока ---
+
 
     def get_item_from_click(self, mouse_pos):
         """
@@ -154,11 +176,12 @@ class InventoryManager:
             slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
             slot_y = panel_y + self.hotbar_panel_padding
             slot_rect = pygame.Rect(slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size)
+
             if slot_rect.collidepoint(mouse_pos) and item:
                 return (item, ('hotbar', index))
 
         # Проверка основного инвентаря
-        if self.inventory_open:
+        if self.inventory_open: # Проверяем клик по инвентарю только если он открыт
             inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_x = (screen.get_width() - inventory_width) // 2
@@ -169,6 +192,7 @@ class InventoryManager:
                     slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
                     slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
                     slot_rect = pygame.Rect(slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size)
+
                     if slot_rect.collidepoint(mouse_pos):
                         item = self.inventory[row][col]
                         if item:
@@ -193,11 +217,12 @@ class InventoryManager:
             slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
             slot_y = panel_y + self.hotbar_panel_padding
             slot_rect = pygame.Rect(slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size)
+
             if slot_rect.collidepoint(mouse_pos):
                 return ('hotbar', index)
 
         # Проверка основного инвентаря
-        if self.inventory_open:
+        if self.inventory_open: # Проверяем клик по инвентарю только если он открыт
             inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_x = (screen.get_width() - inventory_width) // 2
@@ -208,6 +233,7 @@ class InventoryManager:
                     slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
                     slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
                     slot_rect = pygame.Rect(slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size)
+
                     if slot_rect.collidepoint(mouse_pos):
                         return ('inventory', row, col)
 
@@ -219,6 +245,14 @@ class InventoryManager:
         Использует те же координаты и размеры, что и при отрисовке.
         """
         screen = self.game_manager.screen_manager.get_screen()
+
+        # Убедитесь, что item является экземпляром Item и имеет изображение
+        if not isinstance(item, Item) or not hasattr(item, 'image') or not item.image:
+            return None # Возвращаем None, если предмет невалиден для отрисовки
+
+        item_image = item.image
+        img_width, img_height = item_image.get_size()
+
         if slot_info[0] == 'hotbar':
             index = slot_info[1]
             panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
@@ -227,17 +261,17 @@ class InventoryManager:
             panel_y = screen.get_height() - panel_height - 10
             slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
             slot_y = panel_y + self.hotbar_panel_padding
-            # Размеры для отрисовки в слоте хотбара
-            item_slot_size = 40 # Из вашей функции draw_inventory_and_hotbar
 
-            if isinstance(item, Item) and hasattr(item, 'image') and item.image:
-                img_width, img_height = item.image.get_size()
-                scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
-                scaled_width = int(img_width * scale_factor)
-                scaled_height = int(img_height * scale_factor)
-                img_x = slot_x + (self.hotbar_slot_size - scaled_width) // 2
-                img_y = slot_y + (self.hotbar_slot_size - scaled_height) // 2
-                return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
+            item_slot_size = 40 # Размер для отрисовки в слоте хотбара
+
+            scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
+
+            img_x = slot_x + (self.hotbar_slot_size - scaled_width) // 2
+            img_y = slot_y + (self.hotbar_slot_size - scaled_height) // 2
+
+            return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
 
         elif slot_info[0] == 'inventory':
             row, col = slot_info[1], slot_info[2]
@@ -247,18 +281,19 @@ class InventoryManager:
             inventory_y = (screen.get_height() - inventory_height) // 2
             slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
             slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
-            # Размеры для отрисовки в слоте инвентаря
-            item_slot_size = 50 # Из вашей функции draw_inventory_and_hotbar
 
-            if isinstance(item, Item) and hasattr(item, 'image') and item.image:
-                img_width, img_height = item.image.get_size()
-                scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
-                scaled_width = int(img_width * scale_factor)
-                scaled_height = int(img_height * scale_factor)
-                img_x = slot_x + (self.inventory_slot_size - scaled_width) // 2
-                img_y = slot_y + (self.inventory_slot_size - scaled_height) // 2
-                return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
-        return None
+            item_slot_size = 50 # Размер для отрисовки в слоте инвентаря
+
+            scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
+
+            img_x = slot_x + (self.inventory_slot_size - scaled_width) // 2
+            img_y = slot_y + (self.inventory_slot_size - scaled_height) // 2
+
+            return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
+
+        return None # Неизвестный тип слота
 
     def place_item_in_slot(self, item, target_slot_info, source_slot_info=None):
         """
@@ -266,19 +301,24 @@ class InventoryManager:
         Возвращает True при успехе, False при неудаче.
         Обрабатывает обмен и стакание (пока простая версия).
         """
+        if not item:
+            # print("Попытка поместить None.") # Отладочный принт
+            return False
+
         target_type = target_slot_info[0]
+        target_index_or_coords = target_slot_info[1:]
 
         # Получаем текущий предмет в целевом слоте
         current_item_in_target = None
         if target_type == 'hotbar':
-            target_index = target_slot_info[1]
+            target_index = target_index_or_coords[0]
             if 0 <= target_index < len(self.hotbar_slots):
                  current_item_in_target = self.hotbar_slots[target_index]
             else:
                 print(f"Неверный целевой хотбар слот: {target_slot_info}")
                 return False
         elif target_type == 'inventory':
-            target_row, target_col = target_slot_info[1], target_slot_info[2]
+            target_row, target_col = target_index_or_coords
             if 0 <= target_row < self.inventory_rows and 0 <= target_col < self.inventory_cols:
                  current_item_in_target = self.inventory[target_row][target_col]
             else:
@@ -295,12 +335,14 @@ class InventoryManager:
                 self.hotbar_slots[target_index] = item
             elif target_type == 'inventory':
                 self.inventory[target_row][target_col] = item
-            print(f"Предмет {item.name} помещен в целевой слот {target_slot_info}.")
+            # print(f"Предмет {item.name} помещен в целевой слот {target_slot_info}.") # Отладочный принт
             return True
+
         else:
             # Целевой слот занят - попытка обмена или стакания
             # Простая логика обмена: если предмет в целевом слоте не None, меняем местами
-            print(f"Целевой слот {target_slot_info} занят предметом {current_item_in_target.name}. Попытка обмена.")
+            # print(f"Целевой слот {target_slot_info} занят предметом {current_item_in_target.name}. Попытка обмена.") # Отладочный принт
+
             if source_slot_info:
                 # Удаляем предмет из исходного слота перед обменом
                  self._remove_item_from_slot(source_slot_info)
@@ -312,7 +354,8 @@ class InventoryManager:
                 self.hotbar_slots[target_index] = item
             elif target_type == 'inventory':
                 self.inventory[target_row][target_col] = item
-            print(f"Предметы успешно обменены между {source_slot_info} и {target_slot_info}.")
+
+            # print(f"Предметы успешно обменены между {source_slot_info} и {target_slot_info}.") # Отладочный принт
             return True # Обмен считается успешным
 
         # TODO: Добавить логику стакания предметов (если предметы стакуемые и одного типа)
@@ -324,30 +367,44 @@ class InventoryManager:
             index = slot_info[1]
             if 0 <= index < len(self.hotbar_slots):
                 self.hotbar_slots[index] = None
-                # print(f"Предмет удален из хотбар слота {index}.")
+                # print(f"Предмет удален из хотбар слота {index}.") # Отладочный принт
+            # else:
+                # print(f"Ошибка удаления: Неверный индекс хотбар слота {index}") # Отладочный принт
+
         elif slot_type == 'inventory':
             row, col = slot_info[1], slot_info[2]
             if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
                  self.inventory[row][col] = None
-                 # print(f"Предмет удален из инвентарь слота ({row}, {col}).")
+                 # print(f"Предмет удален из инвентарь слота ({row}, {col}).") # Отладочный принт
+            # else:
+                # print(f"Ошибка удаления: Неверные координаты инвентарь слота ({row}, {col})") # Отладочный принт
 
     def _place_item_in_slot_direct(self, item, slot_info):
         """Вспомогательный метод для прямого помещения предмета в слот (без проверок)."""
+        if not item:
+            # print("Попытка напрямую поместить None.") # Отладочный принт
+            return
+
         slot_type = slot_info[0]
         if slot_type == 'hotbar':
             index = slot_info[1]
             if 0 <= index < len(self.hotbar_slots):
                 self.hotbar_slots[index] = item
-                # print(f"Предмет {item.name} напрямую помещен в хотбар слот {index}.")
+                # print(f"Предмет {item.name} напрямую помещен в хотбар слот {index}.") # Отладочный принт
+            # else:
+                # print(f"Ошибка прямого размещения: Неверный индекс хотбар слота {index}") # Отладочный принт
+
         elif slot_type == 'inventory':
             row, col = slot_info[1], slot_info[2]
             if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
                  self.inventory[row][col] = item
-                 # print(f"Предмет {item.name} напрямую помещен в инвентарь слот ({row}, {col}).")
-
+                 # print(f"Предмет {item.name} напрямую помещен в инвентарь слот ({row}, {col}).") # Отладочный принт
+            # else:
+                # print(f"Ошибка прямого размещения: Неверные координаты инвентаря слота ({row}, {col})") # Отладочный принт
 
     def draw(self, screen):
         """Отрисовка инвентаря и хотбара"""
+
         # Отрисовка панели хотбара
         panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
         panel_height = self.hotbar_slot_size + 2 * self.hotbar_panel_padding
@@ -362,22 +419,29 @@ class InventoryManager:
 
             # Отрисовка рамки выбранного слота
             if index == self.selected_item_index:
-                pygame.draw.rect(screen, (255, 215, 0), (slot_x - 5, slot_y - 5, self.hotbar_slot_size + 10, self.hotbar_slot_size + 10), 3, border_radius=10)
+                # Увеличиваем размер рамки и сдвигаем ее для центрирования вокруг слота
+                border_size = 3 # Толщина рамки
+                border_offset = 5 # Отступ рамки от слота
+                pygame.draw.rect(screen, (255, 215, 0),
+                                 (slot_x - border_offset, slot_y - border_offset,
+                                  self.hotbar_slot_size + 2 * border_offset, self.hotbar_slot_size + 2 * border_offset),
+                                 border_size, border_radius=10)
+
 
             # Отрисовка фона слота
             pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size), border_radius=5)
 
             # Отрисовка предмета в слоте (если он не перетаскивается)
-            # Проверяем, что предмет в слоте не является перетаскиваемым предметом
             if item and item is not self.dragging_item:
                 self._draw_item_in_slot(screen, item, slot_x, slot_y, self.hotbar_slot_size, item_slot_size=40) # item_slot_size из вашей отрисовки
 
-        # Отрисовка инвентаря (если открыт)
-        if self.inventory_open:
+        # --- Отрисовка инвентаря (если открыт) ---
+        if self.inventory_open: # Проверяем флаг inventory_open перед отрисовкой основного инвентаря
+
             inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
             inventory_x = (screen.get_width() - inventory_width) // 2
-            inventory_y = (screen.get_height() - inventory_height) // 2
+            inventory_y = (screen.get_height() - inventory_height) // 2 # Позиция по Y для центрирования инвентаря
 
             pygame.draw.rect(screen, (50, 50, 50), (inventory_x, inventory_y, inventory_width, inventory_height), border_radius=10)
 
@@ -390,27 +454,32 @@ class InventoryManager:
                     pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size), border_radius=5)
 
                     item = self.inventory[row][col]
+
                     # Отрисовка предмета в слоте (если он не перетаскивается)
                     if item and item is not self.dragging_item:
                         self._draw_item_in_slot(screen, item, slot_x, slot_y, self.inventory_slot_size, item_slot_size=50) # item_slot_size из вашей отрисовки
+        # --- Конец отрисовки инвентаря ---
+
 
         # Отрисовка перетаскиваемого предмета (всегда поверх всего)
         if self.dragging_item and self.dragging_item.image:
             mouse_x, mouse_y = pygame.mouse.get_pos()
+            # Вычисляем позицию для отрисовки перетаскиваемого предмета с учетом смещения
             draw_x = mouse_x - self.drag_offset[0]
             draw_y = mouse_y - self.drag_offset[1]
 
-            # Масштабируем изображение предмета для перетаскивания (используем размер инвентарного слота)
+            # Масштабируем изображение предмета для перетаскивания (используем размер инвентарного слота для единообразия)
             item_image = self.dragging_item.image
             img_width, img_height = item_image.get_size()
             drag_size = 50 # Размер для перетаскивания (можно сделать настраиваемым)
             scale_factor = min(drag_size / img_width, drag_size / img_height)
             scaled_width = int(img_width * scale_factor)
             scaled_height = int(img_height * scale_factor)
+
+            # Масштабируем изображение
             scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
 
             screen.blit(scaled_image, (draw_x, draw_y))
-
 
     def _draw_item_in_slot(self, screen, item, slot_x, slot_y, slot_size, item_slot_size):
         """Вспомогательный метод для отрисовки предмета внутри слота."""
@@ -420,9 +489,12 @@ class InventoryManager:
              scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
              scaled_width = int(img_width * scale_factor)
              scaled_height = int(img_height * scale_factor)
+
              scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
+
              img_x = slot_x + (slot_size - scaled_width) // 2
              img_y = slot_y + (slot_size - scaled_height) // 2
+
              screen.blit(scaled_image, (img_x, img_y))
         else:
              # Заглушка для отсутствующего изображения/неправильного объекта
