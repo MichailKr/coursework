@@ -114,7 +114,7 @@ class GameManager:
         self.dirt_tile_gid = None # Будет содержать GID тайла земли
 
         # Слои коллизий (имена слоев из Tiled)
-        self.collision_layers_names = ["Коллизия лес", "Колилзия горок", "Дом"]
+        self.collision_layers_names = ["Коллизия лес", "Колилзия горок", "Дом", "Коллизия кусты","Коллизии Мосты", "Коллизия камней", "Коллизии река и Озеро"]
         self.collision_layers = [] # Будет содержать объекты TiledTileLayer для коллизий
 
 

@@ -6,10 +6,64 @@
    <property name="type" value="grass"/>
   </properties>
  </tile>
- <tile id="66" probability="10"/>
- <tile id="67" probability="10"/>
- <tile id="68" probability="10"/>
- <tile id="69" probability="5"/>
- <tile id="70" probability="5"/>
- <tile id="71" probability="10"/>
+ <tile id="55">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="56">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="57">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="58">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="59">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="60">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="66" probability="10">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="67" probability="10">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="68" probability="10">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="69" probability="5">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="70" probability="5">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
+ <tile id="71" probability="10">
+  <properties>
+   <property name="type" value="grass"/>
+  </properties>
+ </tile>
 </tileset>
