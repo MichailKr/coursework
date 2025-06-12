@@ -1,11 +1,13 @@
 import pygame
 import pytmx
 import os
+from src.item import Tool, Item # Убедитесь, что импорт Tool и Item корректен
+from src.game_state import GameState # Импортируем GameState, если он используется в Player
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_manager, x, y, speed=100):
         super().__init__()
-        self.game = game_manager
+        self.game = game_manager # Ссылка на GameManager
 
         # Пути к спрайтам
         self.sprite_path = "sprites/player/sprites" # Путь к основным спрайтам движения
@@ -35,11 +37,9 @@ class Player(pygame.sprite.Sprite):
         self.current_tool_animation_type = None # Тип текущей анимации инструмента (например, 'hoe_swing')
 
         # Установка начального изображения и прямоугольника
-        # Убедитесь, что анимация для начального направления существует и не пуста
         if self.direction in self.animations and self.animations[self.direction]:
              self.image = self.animations[self.direction][0]
         else:
-             # Fallback, если начальная анимация не загружена
              print(f"Предупреждение: Начальная анимация для направления '{self.direction}' пуста или не существует. Используется заглушка.")
              dummy = pygame.Surface((32, 32))
              dummy.fill((0, 255, 0))
@@ -48,8 +48,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
         # Создаем отдельный прямоугольник для коллизий
-        # Размер коллизии (16x16) - возможно, нужно будет настроить
-        self.collision_rect = pygame.Rect(0, 0, 16, 16)
+        self.collision_rect = pygame.Rect(0, 0, 12, 12) # Размер коллизии (настройте по необходимости)
         self.update_collision_rect()  # Обновляем позицию коллизии
 
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")
@@ -61,73 +60,57 @@ class Player(pygame.sprite.Sprite):
             "left": [],
             "right": [],
             "up": [],
-            "hoe_swing": [], # Новая анимация для взмаха мотыгой
+            "hoe_swing": [], # Анимация для взмаха мотыгой
             # Добавьте другие анимации инструментов здесь
         }
 
         # --- Загрузка основных анимаций движения ---
-        # Убедитесь, что этот путь правильный
         self.sprite_path = "sprites/player/sprites"
-
         if not os.path.exists(self.sprite_path):
             print(f"Ошибка: Путь {self.sprite_path} для основных анимаций не существует.")
-            # Создаем заглушку - зеленый квадрат
             dummy = pygame.Surface((16, 16))
             dummy.fill((0, 255, 0))
-            for direction in ["down", "left", "right", "up"]: # Только для основных направлений
+            for direction in ["down", "left", "right", "up"]:
                 animations[direction] = [dummy]
         else:
             try:
-                # Сопоставляем индексы с направлениями (пример для спрайт-листа 4x4)
-                # Этот код предполагает, что у вас есть спрайт-лист с 16 спрайтами
-                # и они расположены в определенном порядке для каждого направления.
-                # Если у вас отдельные файлы для каждого кадра движения, вам нужно
-                # изменить эту часть логики загрузки.
+                # Здесь должна быть ваша логика загрузки спрайтов движения
+                # Пример для спрайт-листа 4x4 (16 спрайтов)
                 directions_map = {
                     "down": [0, 1, 2, 3],
                     "left": [8, 9, 10, 11],
                     "right": [12, 13, 14, 15],
                     "up": [4, 5, 6, 7],
                 }
-                # Загружаем все спрайты из спрайт-листа
                 sprites = []
-                # Предполагаем, что у вас есть 16 спрайтов в спрайт-листе для движения.
-                # Если количество другое, измените диапазон.
-                for i in range(16):
-                    img_path = os.path.join(self.sprite_path, f"sprite_{i}.png") # Убедитесь, что имена файлов соответствуют
+                for i in range(16): # Измените диапазон, если у вас другое количество спрайтов
+                    img_path = os.path.join(self.sprite_path, f"sprite_{i}.png")
                     if os.path.exists(img_path):
                         sprite = pygame.image.load(img_path).convert_alpha()
-                        # Масштабируем спрайт, если нужно (сохраняя пропорции, если возможно)
                         # sprite = pygame.transform.scale(sprite, (70, 92)) # Пример масштабирования
                         sprites.append(sprite)
                     else:
                         print(f"Предупреждение: Файл {img_path} не найден для основной анимации.")
                         dummy = pygame.Surface((16, 16))
-                        dummy.fill((255, 0, 255))  # Фиолетовый для обозначения отсутствия
+                        dummy.fill((255, 0, 255))
                         sprites.append(dummy)
 
-                # Распределяем спрайты по анимациям движения
                 for direction, indices in directions_map.items():
                     for idx in indices:
                         if idx < len(sprites):
                             animations[direction].append(sprites[idx])
                         else:
                              print(f"Предупреждение: Индекс спрайта {idx} вне диапазона для направления {direction}.")
-
             except Exception as e:
                 print(f"Ошибка при загрузке основных спрайтов: {e}")
-                # Создаем заглушку в случае ошибки
                 dummy = pygame.Surface((32, 32))
                 dummy.fill((0, 255, 0))
                 for direction in ["down", "left", "right", "up"]:
                     animations[direction] = [dummy]
 
-
         # --- Загрузка анимации взмаха мотыгой ---
-        # Убедитесь, что путь к спрайтам анимации взмаха мотыгой правильный
-        hoe_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "hoe_swing") # Путь к папке с анимацией взмаха мотыгой
-        # Явно указываем файлы для загрузки, предполагая, что анимация состоит из этих двух кадров
-        hoe_swing_files = ["frame_0.png", "frame_1.png"]
+        hoe_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "hoe_swing")
+        hoe_swing_files = ["frame_0.png", "frame_1.png"] # Убедитесь, что имена файлов соответствуют
 
         if os.path.exists(hoe_swing_sprites_dir):
             try:
@@ -143,19 +126,16 @@ class Player(pygame.sprite.Sprite):
                     else:
                         print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха мотыгой. Проверьте имя файла.")
 
-                if loaded_frames == 0: # Если ни одного кадра не загружено
+                if loaded_frames == 0:
                     print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха мотыгой из {hoe_swing_sprites_dir}. Проверьте имена файлов ({', '.join(hoe_swing_files)}).")
-                    # Fallback: использовать первый кадр из анимации "down" или заглушку
                     if animations["down"]:
                          animations["hoe_swing"] = [animations["down"][0]]
                     else:
                          dummy = pygame.Surface((32, 32))
                          dummy.fill((255, 0, 255))
                          animations["hoe_swing"] = [dummy]
-
             except Exception as e:
                 print(f"Ошибка при загрузке анимации взмаха мотыгой из {hoe_swing_sprites_dir}: {e}")
-                # Fallback
                 if animations["down"]:
                      animations["hoe_swing"] = [animations["down"][0]]
                 else:
@@ -164,7 +144,6 @@ class Player(pygame.sprite.Sprite):
                      animations["hoe_swing"] = [dummy]
         else:
             print(f"Предупреждение: Папка анимации взмаха мотыгой не найдена: {hoe_swing_sprites_dir}")
-            # Fallback
             if animations["down"]:
                  animations["hoe_swing"] = [animations["down"][0]]
             else:
@@ -172,169 +151,159 @@ class Player(pygame.sprite.Sprite):
                  dummy.fill((255, 0, 255))
                  animations["hoe_swing"] = [dummy]
 
-        # Отладочный принт для проверки количества загруженных кадров hoe_swing
         print(f"Загружено {len(animations['hoe_swing'])} кадров для анимации взмаха мотыгой.")
-
-
         return animations
 
+    # --- Добавлен метод handle_input для обработки событий, специфичных для игрока ---
+    def handle_input(self, event):
+        """Обработка событий ввода, специфичных для игрока (использование предметов)."""
+        # Обрабатываем ввод игрока только если игра в состоянии Game, не на паузе
+        # и инвентарь НЕ открыт (так как клики мышью идут на инвентарь)
+        if self.game.state == GameState.GAME and not self.game.paused and not self.game.inventory_manager.inventory_open:
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Левая кнопка мыши
+                    # Получаем выбранный предмет из хотбара через InventoryManager
+                    # Убедитесь, что selected_item_index в InventoryManager обновляется корректно
+                    selected_item_index = self.game.inventory_manager.selected_item_index
+                    # Проверяем, что индекс корректен
+                    if 0 <= selected_item_index < len(self.game.inventory_manager.hotbar_slots):
+                        selected_item = self.game.inventory_manager.hotbar_slots[selected_item_index]
+
+                        # Проверяем, есть ли предмет и является ли он инструментом (например, мотыгой)
+                        if selected_item and isinstance(selected_item, Tool): # Используем isinstance(selected_item, Tool)
+                             if selected_item.type == 'hoe' and not self.is_using_tool:
+                                 self.use_tool() # Вызываем метод использования инструмента
+                             # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                             # elif selected_item.type == 'axe' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию топора
+                             # elif selected_item.type == 'wateringcan' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию лейки
+                             # ...
+                        # else:
+                            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
+                    # else:
+                        # print(f"Неверный индекс выбранного слота хотбара: {selected_item_index}") # Отладочный принт
+
+
+            # Обработка движения (клавиши get_pressed() обрабатываются в update)
+            # Логика движения по клавишам WASD/стрелки обрабатывается в методе update()
+            pass # Оставляем этот метод handle_input сфокусированным на использовании предметов
+    # --- Конец добавления метода handle_input ---
+
     def update(self, dt):
-        """Обновление игрока"""
-        # --- Обработка использования инструмента (левая кнопка мыши) ---
-        mouse_buttons = pygame.mouse.get_pressed()
-        # Проверяем нажатие левой кнопки мыши и что игрок не использует инструмент
-        if mouse_buttons[0] and not self.is_using_tool:
-             # Получаем выбранный предмет из хотбара
-             # Убедитесь, что self.game существует и имеет атрибуты selected_item_index и hotbar_slots
-             if self.game and hasattr(self.game, 'selected_item_index') and hasattr(self.game, 'hotbar_slots') and 0 <= self.game.selected_item_index < len(self.game.hotbar_slots):
-                  selected_item_index = self.game.selected_item_index
-                  selected_item = self.game.hotbar_slots[selected_item_index]
-                  # Проверяем, есть ли предмет и является ли он мотыгой
-                  if selected_item and hasattr(selected_item, 'type') and selected_item.type == 'hoe':
-                      self.use_tool()  # Вызываем метод использования инструмента
+        """Обновление игрока (движение и анимация)"""
 
+        # --- Обработка движения (только если игрок не использует инструмент и инвентарь закрыт) ---
+        # Логика движения обрабатывается здесь с помощью pygame.key.get_pressed()
+        if not self.is_using_tool and not self.game.inventory_manager.inventory_open:
 
-        # --- Обработка движения (только если игрок не использует инструмент) ---
-        if not self.is_using_tool:
             keys = pygame.key.get_pressed()
-
             prev_x = self.x
             prev_y = self.y
             was_moving = self.moving # Сохраняем предыдущее состояние движения
 
-            # Считываем состояние клавиш движения
-            input_left = keys[pygame.K_LEFT] or keys[pygame.K_a]
-            input_right = keys[pygame.K_RIGHT] or keys[pygame.K_d]
-            input_up = keys[pygame.K_UP] or keys[pygame.K_w]
-            input_down = keys[pygame.K_DOWN] or keys[pygame.K_s]
-
-            # Рассчитываем смещение
             dx = 0
             dy = 0
 
-            if input_left:
+            if keys[self.game.settings['controls']['left']]: # Используем настройки клавиш из GameManager
                 dx = -self.speed * dt
-            elif input_right:
+            elif keys[self.game.settings['controls']['right']]:
                 dx = self.speed * dt
 
-            if input_up:
+            if keys[self.game.settings['controls']['up']]:
                 dy = -self.speed * dt
-            elif input_down:
+            elif keys[self.game.settings['controls']['down']]:
                 dy = self.speed * dt
 
-            # Определяем, движется ли игрок
             self.moving = (dx != 0 or dy != 0)
 
-            # Определяем направление (приоритет вертикали при диагональном движении)
+            # Определяем направление
             if self.moving:
-                if input_up:
+                if keys[self.game.settings['controls']['up']]:
                     self.direction = "up"
-                elif input_down:
+                elif keys[self.game.settings['controls']['down']]:
                     self.direction = "down"
-                elif input_left: # Если нет вертикального движения, но есть горизонтальное
+                elif keys[self.game.settings['controls']['left']]:
                     self.direction = "left"
-                elif input_right: # Если нет вертикального движения, но есть горизонтальное
+                elif keys[self.game.settings['controls']['right']]:
                     self.direction = "right"
-                # Если нажимаются обе горизонтальные и обе вертикальные (что маловероятно, но возможно),
-                # направление будет последним из True, т.е. down. Это соответствует вашему исходному поведению.
 
-            # Обновляем позиции отдельно, чтобы проверить коллизии
-            # Обновляем X
+
+            # Обновляем позиции и проверяем коллизии
             self.x += dx
             self.rect.x = int(self.x)
-            self.update_collision_rect() # Обновляем позицию прямоугольника коллизии
-
-            # Проверяем коллизию по X оси
-            if self.game and hasattr(self.game, 'check_collision'): # Проверяем наличие метода в GameManager
+            self.update_collision_rect()
+            if self.game and hasattr(self.game, 'check_collision'):
                  if self.game.check_collision(self.collision_rect):
-                     self.x = prev_x # Откатываем X позицию при коллизии
+                     self.x = prev_x
                      self.rect.x = int(prev_x)
-                     self.update_collision_rect() # Обновляем прямоугольник коллизии после отката
+                     self.update_collision_rect()
 
-            # Обновляем Y
             self.y += dy
             self.rect.y = int(self.y)
-            self.update_collision_rect() # Обновляем позицию прямоугольника коллизии
-
-            # Проверяем коллизию по Y оси
-            if self.game and hasattr(self.game, 'check_collision'): # Проверяем наличие метода в GameManager
+            self.update_collision_rect()
+            if self.game and hasattr(self.game, 'check_collision'):
                  if self.game.check_collision(self.collision_rect):
-                     self.y = prev_y # Откатываем Y позицию при коллизии
+                     self.y = prev_y
                      self.rect.y = int(prev_y)
-                     self.update_collision_rect() # Обновляем прямоугольник коллизии после отката
+                     self.update_collision_rect()
 
             # Ограничение движения игрока границами карты
             if hasattr(self.game, "tmx_data") and self.game.map_loaded:
                 map_width = self.game.tmx_data.width * self.game.tmx_data.tilewidth
                 map_height = self.game.tmx_data.height * self.game.tmx_data.tileheight
-                # Учитываем размер спрайта игрока при ограничении
                 self.x = max(0.0, min(self.x, float(map_width - self.rect.width)))
                 self.y = max(0.0, min(self.y, float(map_height - self.rect.height)))
                 self.rect.x = int(self.x)
                 self.rect.y = int(self.y)
-                self.update_collision_rect() # Обновляем прямоугольник коллизии после ограничения границами карты
-
+                self.update_collision_rect()
 
             # Обновление анимации движения
-            # was_moving передается, чтобы update_animation мог сбросить кадр при смене состояния движения
             self.update_animation(dt, was_moving)
 
-
-        else: # Если игрок использует инструмент, обновляем только анимацию инструмента
+        elif self.is_using_tool: # Если игрок использует инструмент, обновляем только анимацию инструмента
              self.update_tool_use_animation(dt)
-
+        # else: # Если инвентарь открыт или игра на паузе, анимация движения не обновляется
+            # was_moving = self.moving # Сохраняем предыдущее состояние движения
+            # self.moving = False # Игрок не движется, если инвентарь открыт или пауза
+            # self.update_animation(dt, was_moving) # Обновляем анимацию, чтобы перейти в idle
 
     def update_collision_rect(self):
-        """Обновляет позицию прямоугольника коллизии.
-           Размещаем прямоугольник коллизии в нижней части спрайта.
-        """
-        # Предполагаем, что коллизия находится в нижней части спрайта
+        """Обновляет позицию прямоугольника коллизии."""
         self.collision_rect.midbottom = self.rect.midbottom
 
     def update_animation(self, dt, was_moving):
         """Обновление анимации игрока (движения)"""
-        # Эта логика выполняется только если self.is_using_tool == False
+        if self.is_using_tool: # Если используется инструмент, не обновляем анимацию движения
+            return
 
-        # Проверяем, что анимация для текущего направления существует и не пуста
         if self.direction not in self.animations or not self.animations[self.direction]:
             print(f"Предупреждение: Анимация для направления '{self.direction}' пуста или не существует. Используется Fallback.")
-            # Fallback, если анимация направления не загружена или пуста
             if "down" in self.animations and self.animations["down"]:
-                 self.image = self.animations["down"][0] # Используем первый кадр "вниз" как заглушку
+                 self.image = self.animations["down"][0]
             else:
-                 # Абсолютный Fallback - зеленая заглушка
                  dummy = pygame.Surface((32, 32))
                  dummy.fill((0, 255, 0))
                  self.image = dummy
-            return # Выходим, если нет валидной анимации для текущего направления
+            return
 
-
-        # Если начали или прекратили движение, сбрасываем кадр и таймер
         if was_moving != self.moving:
             self.current_frame = 0
             self.animation_timer = 0
 
         if self.moving:
-            # Обновляем таймер анимации
             self.animation_timer += dt
-            # Если прошло достаточно времени, переходим к следующему кадру
-            # Используем len() для получения количества кадров в текущей анимации
             if self.animation_timer >= 1.0 / self.animation_speed:
                 self.animation_timer = 0
-                # Переключаемся на следующий кадр
                 self.current_frame = (self.current_frame + 1) % len(self.animations[self.direction])
         else:
-            # Если не движемся, используем первый кадр (idle) по текущему направлению
-            self.current_frame = 0
+            self.current_frame = 0 # Используем первый кадр (idle) при остановке
 
-        # Обновляем текущее изображение на кадр анимации движения
         self.image = self.animations[self.direction][self.current_frame]
 
-
     def update_tool_use_animation(self, dt):
-        """Обновление анимации использования инструмента"""
-        # Эта логика выполняется только если self.is_using_tool == True
-
+        """Обновление анимации использования инструмента и вызов действия в нужный момент."""
         # Проверяем, что текущая анимация инструмента существует и не пуста
         if self.current_tool_animation_type and \
            self.current_tool_animation_type in self.animations and \
@@ -343,9 +312,9 @@ class Player(pygame.sprite.Sprite):
             self.tool_use_animation_timer += dt
 
             # Проигрываем анимацию взмаха
-            # Используем len() для получения количества кадров в текущей анимации инструмента
             if self.tool_use_animation_timer >= 1.0 / self.tool_use_animation_speed:
                 self.tool_use_animation_timer = 0
+                prev_frame = self.tool_use_current_frame # Сохраняем предыдущий кадр
                 self.tool_use_current_frame += 1
 
                 # Проверяем, закончилась ли анимация
@@ -356,9 +325,8 @@ class Player(pygame.sprite.Sprite):
 
                     # После завершения анимации инструмента, возвращаемся к idle-анимации по текущему направлению
                     if self.direction in self.animations and self.animations[self.direction]:
-                         self.image = self.animations[self.direction][0] # Первый кадр idle
+                         self.image = self.animations[self.direction][0]
                     else:
-                         # Fallback, если анимация направления не загружена
                          dummy = pygame.Surface((32, 32))
                          dummy.fill((0, 255, 0))
                          self.image = dummy
@@ -367,12 +335,30 @@ class Player(pygame.sprite.Sprite):
                     # Проигрываем следующий кадр анимации инструмента
                     self.image = self.animations[self.current_tool_animation_type][self.tool_use_current_frame]
 
+                # --- Вызов действия инструмента в определенный момент анимации ---
+                # Вызываем till_tile только один раз при переходе на нужный кадр
+                if self.current_tool_animation_type == 'hoe_swing':
+                    # Например, вызов till_tile на втором кадре анимации взмаха (индекс 1)
+                    if prev_frame == 0 and self.tool_use_current_frame == 1: # Вызываем при переходе от кадра 0 к 1
+                         target_tile_x, target_tile_y = self.get_tile_in_front()
+                         if self.game and hasattr(self.game, 'till_tile') and (target_tile_x != -1 or target_tile_y != -1):
+                              self.game.till_tile(target_tile_x, target_tile_y)
+                         # else:
+                             # print("Не удалось определить координаты тайла перед игроком или GameManager не имеет till_tile.") # Отладочный принт
+
+                # TODO: Добавить вызовы действий для других инструментов в соответствующие моменты анимации
+                # elif self.current_tool_animation_type == 'axe_swing':
+                #     if prev_frame == X and self.tool_use_current_frame == Y:
+                #         self.game.cut_tree(...) # Вызов функции рубки дерева
+                # elif self.current_tool_animation_type == 'watering_can':
+                #     if prev_frame == X and self.tool_use_current_frame == Y:
+                #         self.game.water_tile(...) # Вызов функции полива
+
         else:
             # Если нет текущей анимации инструмента или она пуста, сбрасываем флаг использования инструмента
             self.is_using_tool = False
             self.tool_use_current_frame = 0
             self.current_tool_animation_type = None
-
             # Возвращаемся к idle-анимации движения
             if self.direction in self.animations and self.animations[self.direction]:
                  self.image = self.animations[self.direction][0]
@@ -381,77 +367,52 @@ class Player(pygame.sprite.Sprite):
                  dummy.fill((0, 255, 0))
                  self.image = dummy
 
-
     def use_tool(self):
-        # Get the currently selected item from the hotbar
-        # Убедитесь, что self.game существует и имеет атрибуты selected_item_index и hotbar_slots
-        if self.game is None or not hasattr(self.game, 'selected_item_index') or not hasattr(self.game, 'hotbar_slots'):
-             print("Ошибка в use_tool: Нет доступа к информации о хотбаре в GameManager.")
+        """Запускает анимацию использования текущего выбранного инструмента."""
+        # Получаем выбранный предмет из хотбара через InventoryManager
+        if self.game is None or not hasattr(self.game, 'inventory_manager'):
+             print("Ошибка в use_tool: Нет доступа к InventoryManager в GameManager.")
              return
 
-        selected_item_index = self.game.selected_item_index
-        # Проверяем, что индекс слота хотбара корректен
-        if not (0 <= selected_item_index < len(self.game.hotbar_slots)):
+        inventory_manager = self.game.inventory_manager
+        selected_item_index = inventory_manager.selected_item_index
+
+        if not (0 <= selected_item_index < len(inventory_manager.hotbar_slots)):
             # print("Неверный индекс выбранного слота хотбара.") # Отладочный принт
-            return # Выходим, если индекс некорректен
+            return
 
-        selected_item = self.game.hotbar_slots[selected_item_index]
+        selected_item = inventory_manager.hotbar_slots[selected_item_index]
 
-        if selected_item: # Check if there is an item in the selected slot
-            # Check the type of the selected item
-            if hasattr(selected_item, 'type'):
-                if selected_item.type == 'hoe':
-                    # If the selected item is a hoe, activate the swing animation
-                    self.is_using_tool = True
-                    self.tool_use_animation_timer = 0
-                    self.tool_use_current_frame = 0
-                    self.current_tool_animation_type = 'hoe_swing' # Устанавливаем тип анимации инструмента
-
-                    # Call the till_tile method in GameManager
-                    target_tile_x, target_tile_y = self.get_tile_in_front()
-                    # Убедитесь, что self.game существует и имеет метод till_tile
-                    if self.game and hasattr(self.game, 'till_tile'):
-                         # Проверяем, что till_tile успешно получил координаты тайла
-                         if target_tile_x != -1 or target_tile_y != -1:
-                             self.game.till_tile(target_tile_x, target_tile_y)
-                         # else:
-                             # print("Не удалось определить координаты тайла перед игроком.") # Отладочный принт
-                    # else:
-                        # print("GameManager не имеет метода 'till_tile'.") # Отладочный принт
-
-                # Add checks for other tool types here later (e.g., 'axe', 'wateringcan')
-                # elif selected_item.type == 'axe':
-                #     # Activate axe swing animation, call cut_tree
-                #     pass
-                # elif selected_item.type == 'wateringcan':
-                #     # Activate watering animation, call water_tile
-                #     pass
-        else:
-            # print("No item selected or item is not a tool.") # Optional: print a message if no tool is selected
-            pass # No action if no item is selected
-
+        if selected_item and isinstance(selected_item, Tool):
+            if selected_item.type == 'hoe':
+                self.is_using_tool = True
+                self.tool_use_animation_timer = 0
+                self.tool_use_current_frame = 0
+                self.current_tool_animation_type = 'hoe_swing'
+                # Логика вызова till_tile ПЕРЕНЕСЕНА в update_tool_use_animation!
+            # TODO: Добавить запуск анимаций для других инструментов
+            # elif selected_item.type == 'axe':
+            #     self.is_using_tool = True
+            #     self.tool_use_animation_timer = 0
+            #     self.tool_use_current_frame = 0
+            #     self.current_tool_animation_type = 'axe_swing'
+            # ...
+        # else:
+            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
 
     def get_tile_in_front(self):
         """Определяет координаты клетки на карте, которая находится перед игроком."""
-
-        # This assumes a grid-based map with fixed tile size
-
         if not self.game or not hasattr(self.game, 'tmx_data') or not self.game.map_loaded:
              print("Ошибка в get_tile_in_front: Нет доступа к tmx_data в GameManager или карта не загружена.")
-             return -1, -1 # Возвращаем некорректные координаты в случае ошибки
+             return -1, -1
 
+        tile_size = self.game.tmx_data.tilewidth
 
-        tile_size = self.game.tmx_data.tilewidth # Получаем размер тайла из GameManager
-
-        # Рассчитываем центр прямоугольника коллизии игрока
         player_center_x = self.collision_rect.centerx
         player_center_y = self.collision_rect.centery
 
-        # Определяем положение центра следующей клетки в зависимости от направления игрока
         offset_x, offset_y = 0, 0
-
-        # Смещения в пикселях для определения центра следующей клетки
-        pixel_offset = tile_size // 2 # Смещаемся на половину тайла в направлении движения
+        pixel_offset = tile_size // 2
 
         if self.direction == "right":
             offset_x = pixel_offset
@@ -462,15 +423,12 @@ class Player(pygame.sprite.Sprite):
         elif self.direction == "up":
             offset_y = -pixel_offset
 
-        # Вычисляем примерный центр следующей клетки в мировых координатах
         target_center_x = player_center_x + offset_x
         target_center_y = player_center_y + offset_y
 
-        # Переводим мировые координаты в координаты сетки тайлов
         target_tile_x = int(target_center_x // tile_size)
         target_tile_y = int(target_center_y // tile_size)
 
-        # Ограничиваем координаты тайла границами карты
         map_width_tiles = self.game.tmx_data.width
         map_height_tiles = self.game.tmx_data.height
 
@@ -478,37 +436,3 @@ class Player(pygame.sprite.Sprite):
         target_tile_y = max(0, min(target_tile_y, map_height_tiles - 1))
 
         return target_tile_x, target_tile_y
-
-    def add_item_to_inventory(self, item, slot_index=None, inventory_coords=None):
-        """
-        Добавляет предмет в инвентарь игрока.
-        Можно указать либо индекс слота хотбара (slot_index),
-        либо координаты в основном инвентаре (inventory_coords = (row, col)).
-        Если ничего не указано, попытается добавить в первый свободный слот хотбара.
-        """
-
-        if self.game is None or not hasattr(self.game, 'hotbar_slots') or not hasattr(self.game, 'inventory'):
-             print("Ошибка в add_item_to_inventory: Нет доступа к инвентарю/хотбару в GameManager.")
-             return
-
-        if slot_index is not None:
-            if 0 <= slot_index < len(self.game.hotbar_slots):
-                self.game.hotbar_slots[slot_index] = item
-                print(f"Предмет {item.name} добавлен в слот хотбара {slot_index}")
-            else:
-                print(f"Ошибка в add_item_to_inventory: Неверный индекс слота хотбара: {slot_index}")
-        elif inventory_coords is not None:
-            row, col = inventory_coords
-            if 0 <= row < len(self.game.inventory) and 0 <= col < len(self.game.inventory[0]):
-                self.game.inventory[row][col] = item
-                print(f"Предмет {item.name} добавлен в инвентарь в ({row}, {col})")
-            else:
-                 print(f"Ошибка в add_item_to_inventory: Неверные координаты инвентаря: ({row}, {col})")
-        else:
-            # Попытка добавить в первый свободный слот хотбара
-            for i in range(len(self.game.hotbar_slots)):
-                if self.game.hotbar_slots[i] is None:
-                    self.game.hotbar_slots[i] = item
-                    print(f"Предмет {item.name} добавлен в первый свободный слот хотбара {i}")
-                    return # Выходим после успешного добавления
-            print(f"Ошибка в add_item_to_inventory: Нет свободного места в хотбаре для предмета {item.name}")

@@ -11,6 +11,7 @@ import pytmx
 import os
 import math
 import time
+from src.inventory_manager import InventoryManager
 
 class GameManager:
     def __init__(self):
@@ -91,12 +92,7 @@ class GameManager:
         #      print(f"Ошибка загрузки изображения топора: {e}")
         #      print(f"Проверьте путь к файлу: {axe_image_path}")
 
-
-        self.inventory_open = False
-        self.selected_item_index = 0 # Индекс выбранного слота в хотбаре
-        self.hotbar_slots = [None] * 8 # Список для хотбара (8 слотов)
-        self.inventory = [[None for _ in range(3)] for _ in range(8)] # Основной инвентарь (8x3 слота)
-
+        self.inventory_manager = InventoryManager(self)
 
         self.all_sprites = pygame.sprite.Group()
         self.players = pygame.sprite.Group()
@@ -236,25 +232,28 @@ class GameManager:
             start_y = screen.get_height() // 2
 
         # При создании игрока передаем ссылку на GameManager
+        # Важно: Игрок может нуждаться в ссылке на InventoryManager для использования предметов
         self.player = Player(self, start_x, start_y)
         self.all_sprites.add(self.player)
         self.players.add(self.player)
         print(f"Игрок создан на позиции ({start_x}, {start_y})")
 
-        # --- Добавляем мотыгу в инвентарь игрока ---
+        # --- Добавляем мотыгу в инвентарь игрока через InventoryManager ---
         if 'hoe' in self.tools:
-            print("Мотыга найдена в self.tools.") # Отладочный вывод
-            # Проверяем, что у игрока есть метод add_item_to_inventory
-            if hasattr(self.player, 'add_item_to_inventory'):
-                print("У игрока есть метод add_item_to_inventory.") # Отладочный вывод
+            print("Мотыга найдена в self.tools.")
+            # Используем InventoryManager для добавления предмета
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
                 # Добавляем мотыгу в первый слот хотбара (или другое место)
-                self.player.add_item_to_inventory(self.tools['hoe'], slot_index=0)  # Добавляем в 1-й слот хотбара
-                print("Мотыга добавлена в инвентарь игрока.")
+                success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
+                if success:
+                    print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
+                else:
+                    print("Ошибка: Не удалось добавить мотыгу в инвентарь через InventoryManager.")
             else:
-                print("Ошибка: У игрока нет метода 'add_item_to_inventory'.")
+                 print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
         else:
             print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
-
+        # --- Конец блока изменения ---
 
     def till_tile(self, tile_x, tile_y):
         """
@@ -316,16 +315,8 @@ class GameManager:
             if tile_properties and isinstance(tile_properties, dict) and tile_properties.get('type') == 'grass':
                 print("Тайл является травой. Производим вспашку.") # Отладочный вывод
 
-                # --- Изменяем тайл на слое ТРАВКИ на тайл земли ---
-                # Обращаемся к данным слоя ТРАВКИ через .data, используя координаты
                 self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
                 print(f"Вспахана клетка: ({tile_x}, {tile_y})")
-
-                # !!! ВАЖНО: Здесь нужно добавить логику для перерисовки карты или только измененной области !!!
-                # Ваш текущий метод draw_map отрисовывает видимую часть карты каждый кадр,
-                # что должно быть достаточно для отображения изменений.
-                # Убедитесь, что draw_map вызывается после update.
-                # Это уже происходит в цикле run: self.update() -> self.draw()
 
             else:
                  print(f"Тайл не является травой или не имеет нужного свойства. Свойства: {tile_properties}. Требуется: {{'type': 'grass'}}") # Отладочный вывод
@@ -336,93 +327,50 @@ class GameManager:
     # --- Методы обработки событий и отрисовки ---
 
     def handle_events(self):
-        if not self.event_handler.handle_events():
-            self.running = False
-            return False
+        """
+        Обработка всех событий Pygame и их распределение по соответствующим менеджерам.
+        Включает обработку общих событий, инвентаря и взаимодействия с магазином.
+        """
+        events = pygame.event.get()
 
-        # Обработка событий клавиатуры
-        for event in pygame.event.get():
+        for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
                 return False
-            
+
+            if not self.event_handler.handle_events(event):
+                self.running = False
+                return False
+
+            # --- Передаем событие игроку для обработки его специфического ввода (использование предметов) ---
+            if hasattr(self, 'player') and self.player: # Убедитесь, что игрок существует
+                 self.player.handle_input(event)
+            # --- Конец передачи игроку ---
+
+            # Обработка клавиши взаимодействия (E) - пример взаимодействия, которое может быть в GameManager
             if event.type == pygame.KEYDOWN:
-                # Обработка клавиши взаимодействия (E)
-                if event.key == self.settings['controls']['interact']:  # pygame.K_e
-    # Проверяем взаимодействие с магазином
-                    if hasattr(self.shop, 'is_player_in_range') and self.shop.is_player_in_range():
-                        self.shop.toggle_shop()
-                        print("Магазин открыт/закрыт")
-                    
-                    # Проверяем взаимодействие с другими объектами
-                    # ... другие взаимодействия
+                if event.key == self.settings['controls']['interact']:
+                    if hasattr(self, 'shop') and isinstance(self.shop, Shop):
+                         # Убедитесь, что инвентарь закрыт при взаимодействии с магазином
+                         if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                            self.shop.toggle_shop()
+                            print("Магазин открыт/закрыт")
+                         elif self.inventory_manager.inventory_open and self.shop.is_open: # Если инвентарь открыт и магазин открыт, может быть другая логика
+                             pass # Например, взаимодействие с инвентарем магазина
 
-        keys = pygame.key.get_pressed()
-        
-        # Обработка выбора слота хотбара клавишами 1-8
-        for i in range(8):
-            if keys[getattr(pygame, f'K_{i + 1}')]:
-                self.selected_item_index = i
-                print(f"Выбран слот хотбара: {self.selected_item_index}")
+            self.inventory_manager.handle_input(event)
 
-        # Обработка открытия/закрытия инвентаря клавишей T
-        if keys[pygame.K_t] and not hasattr(self, '_t_pressed'):
-            self._t_pressed = True
-            self.inventory_open = not self.inventory_open
-            print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}")
-        elif not keys[pygame.K_t] and hasattr(self, '_t_pressed'):
-            del self._t_pressed
-        if not hasattr(self, 'shop'):
-            print("Ошибка: self.shop не инициализирован!")
-            return False
-
-        if not isinstance(self.shop, Shop):
-            print("Ошибка: self.shop не является экземпляром Shop!")
-            return False
         return True
-
-    def init_game_objects(self):
-        spawn_point = self.get_spawn_point()
-        if spawn_point:
-            start_x, start_y = spawn_point
-        else:
-            screen = self.screen_manager.get_screen()
-            start_x = screen.get_width() // 2
-            start_y = screen.get_height() // 2
-
-        # При создании игрока передаем ссылку на GameManager
-        self.player = Player(self, start_x, start_y)
-        self.all_sprites.add(self.player)
-        self.players.add(self.player)
-        print(f"Игрок создан на позиции ({start_x}, {start_y})")
-
-        # --- Добавляем мотыгу в инвентарь игрока ---
-        if 'hoe' in self.tools:
-            print("Мотыга найдена в self.tools.") # Отладочный вывод
-            # Проверяем, что у игрока есть метод add_item_to_inventory
-            if hasattr(self.player, 'add_item_to_inventory'):
-                print("У игрока есть метод add_item_to_inventory.") # Отладочный вывод
-                # Добавляем мотыгу в первый слот хотбара (или другое место)
-                self.player.add_item_to_inventory(self.tools['hoe'], slot_index=0)  # Добавляем в 1-й слот хотбара
-                print("Мотыга добавлена в инвентарь игрока.")
-            else:
-                print("Ошибка: У игрока нет метода 'add_item_to_inventory'.")
-        else:
-            print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
 
     def update(self):
         """Обновляет состояние игры"""
         delta_time = self.clock.tick(self.settings['fps_limit']) / 1000.0
-
         if self.state == GameState.GAME and not self.paused:
             # Сначала обновляем спрайты (включая игрока)
             self.all_sprites.update(delta_time)
-
             # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
-
             self.update_clock()
-
             # Подсчёт FPS
             self.fps_counter += 1
             current_time = pygame.time.get_ticks()
@@ -434,7 +382,6 @@ class GameManager:
     def draw(self):
         """Отрисовка текущего состояния игры"""
         screen = self.screen_manager.get_screen()
-
         if self.state == GameState.MENU:
             self.render_manager.draw_menu(self)
         elif self.state == GameState.SETTINGS:
@@ -442,121 +389,25 @@ class GameManager:
         elif self.state == GameState.GAME:
             # Очистка экрана
             screen.fill((50, 50, 50))  # Серый фон
-
             # Отрисовка только видимой части карты
             if self.map_loaded:
                 self.render_map(screen)
-
             # Отрисовка всех спрайтов
-            # Сортируем спрайты по Y координате для правильного отображения (игрок перед объектами и т.д.)
-            # Это базовая сортировка, для сложных карт может потребоваться более сложная логика
             all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.bottom)
-
             for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
-
-
             self.draw_clock(screen)
-
             # Отрисовка интерфейса (всегда поверх всего остального)
-            self.draw_inventory_and_hotbar(screen)
+            # --- Добавьте вызов отрисовки инвентаря из InventoryManager ---
+            self.inventory_manager.draw(screen)
+            # --- Конец блока добавления ---
             self.shop.draw(screen)
-
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
             screen.blit(fps_text, (10, 10))
-
         # Обновление экрана
         pygame.display.flip()
-
-    def draw_inventory_and_hotbar(self, screen):
-        panel_width = len(self.hotbar_slots) * 60 + 20
-        panel_height = 70
-        panel_x = (screen.get_width() - panel_width) // 2
-        panel_y = screen.get_height() - panel_height - 10
-
-        # Отрисовка панели хотбара
-        pygame.draw.rect(screen, (50, 50, 50), (panel_x, panel_y, panel_width, panel_height), border_radius=10) # Добавлен border_radius
-
-        for index, item in enumerate(self.hotbar_slots):
-            slot_x = panel_x + 10 + index * 60
-            slot_y = panel_y + 10
-
-            # Отрисовка рамки выбранного слота
-            if index == self.selected_item_index:
-                pygame.draw.rect(screen, (255, 215, 0), (slot_x - 5, slot_y - 5, 50 + 10, 50 + 10), 3, border_radius=10)
-
-            # Отрисовка фона слота
-            pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, 50, 50), border_radius=5) # Добавлен border_radius
-
-            # Отрисовка предмета в слоте
-            if item:
-                # Проверяем, является ли item экземпляром класса Item (или его подкласса) и имеет ли изображение
-                if isinstance(item, Item) and hasattr(item, 'image') and item.image:
-                    # Масштабируем изображение предмета до размера слота хотбара (например, 40x40)
-                    # Сохраняем исходное соотношение сторон при масштабировании
-                    item_image = item.image
-                    img_width, img_height = item_image.get_size()
-                    slot_size = 40
-                    scale_factor = min(slot_size / img_width, slot_size / img_height)
-                    scaled_width = int(img_width * scale_factor)
-                    scaled_height = int(img_height * scale_factor)
-                    scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
-
-                    # Вычисляем позицию для центрирования изображения в слоте
-                    img_x = slot_x + (50 - scaled_width) // 2
-                    img_y = slot_y + (50 - scaled_height) // 2
-
-                    screen.blit(scaled_image, (img_x, img_y))
-                else:
-                    # Если изображения нет или item не является предметом, отрисовать маленькую заглушку
-                    dummy = pygame.Surface((40, 40))
-                    dummy.fill((255, 0, 0)) # Красная заглушка для отсутствующего изображения/неправильного объекта
-                    screen.blit(dummy, (slot_x + 5, slot_y + 5))
-
-
-        # Отрисовка инвентаря (если открыт)
-        if self.inventory_open:
-            inventory_width = 3 * 70 + 20
-            inventory_height = 8 * 70 + 20
-            inventory_x = (screen.get_width() - inventory_width) // 2
-            inventory_y = (screen.get_height() - inventory_height) // 2
-
-            pygame.draw.rect(screen, (50, 50, 50), (inventory_x, inventory_y, inventory_width, inventory_height), border_radius=10) # Добавлен border_radius
-
-            for row in range(8):
-                for col in range(3):
-                    slot_x = inventory_x + 10 + col * 70
-                    slot_y = inventory_y + 10 + row * 70
-
-                    # Отрисовка фона слота инвентаря
-                    pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, 60, 60), border_radius=5) # Добавлен border_radius
-
-                    item = self.inventory[row][col]
-                    if item:
-                        # Отрисовка предмета в слоте инвентаря
-                        if isinstance(item, Item) and hasattr(item, 'image') and item.image:
-                             # Масштабируем изображение предмета до размера слота инвентаря (например, 50x50)
-                             item_image = item.image
-                             img_width, img_height = item_image.get_size()
-                             slot_size = 50 # Размер для инвентаря
-                             scale_factor = min(slot_size / img_width, slot_size / img_height)
-                             scaled_width = int(img_width * scale_factor)
-                             scaled_height = int(img_height * scale_factor)
-                             scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
-
-                             # Вычисляем позицию для центрирования изображения в слоте
-                             img_x = slot_x + (60 - scaled_width) // 2
-                             img_y = slot_y + (60 - scaled_height) // 2
-
-                             screen.blit(scaled_image, (img_x, img_y))
-                        else:
-                            # Заглушка для отсутствующего изображения/неправильного объекта в инвентаре
-                             dummy = pygame.Surface((50, 50))
-                             dummy.fill((255, 0, 0)) # Красная заглушка
-                             screen.blit(dummy, (slot_x + 5, slot_y + 5))
-
 
     def init_clock(self, screen):
         screen_width = screen.get_width()
