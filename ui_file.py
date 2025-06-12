@@ -485,59 +485,54 @@ def leaderboardScreen(screen, screen_size):
     return 0 # Возвращаемся в главное меню
 
 
-def endGame(mode, value): # Не принимаем screen и screen_size, так как они будут доступны через pygame.display.get_surface()
-    screen = pygame.display.get_surface() # Получаем текущую поверхность
-    screen_size = screen.get_size() # Получаем текущий размер
+def endGame(mode, value):
+    screen = pygame.display.get_surface()
+    screen_size = screen.get_size()
 
     # Define colours
-    WHITE = (255,255,255) # Используем WHITE для текста
+    WHITE = (255,255,255)
     GOLD = (249,166,2)
     GREEN = (0,255,0)
     BLUE = (0,0,255)
-    RED = (255,0,0) # Цвет для поражения
+    RED = (255,0,0)
 
     pygame.display.set_caption("Игра окончена")
 
     background_image = pygame.image.load('fon.jpg').convert()
     background_image = pygame.transform.scale(background_image, screen.get_size())
     screen.blit(background_image, (0, 0))
-    pygame.display.flip() # Добавляем явное обновление экрана после заливки
+    pygame.display.flip()
 
     # Общий заголовок "Игра окончена"
     displayMessage("Игра окончена", WHITE, screen, 50, screen_size, screen_size[1]//4)
 
     # Текст результата в зависимости от режима
     if mode == 0:
-       # Для режима Solo, value - это время. Этот экран показывается только при поражении в соло режиме теперь.
-       text = "Вы проиграли!" # Для поражения в соло
-       displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4) # Красный цвет для поражения
-
+       text = "Вы проиграли!"
+       displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4)
     elif mode == 1:
        text = "Игрок " + str(value) + " победил!"
-       if value == 1:
-          displayMessage(text, GREEN, screen, 30, screen_size, screen_size[1]*2//4)
-       else:
-          displayMessage(text, BLUE, screen, 30, screen_size, screen_size[1]*2//4)
-
-    elif mode == 2 or mode == 3:
+       color = GREEN if value == 1 else BLUE
+       displayMessage(text, color, screen, 30, screen_size, screen_size[1]*2//4)
+    elif mode in [2, 3]:
        if value == 1:
           text = "Вы победили!"
           displayMessage(text, GOLD, screen, 30, screen_size, screen_size[1]*2//4)
        else:
           text = "Куксик победил!"
-          displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4) # Красный для поражения
-
+          displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4)
     elif mode == 4:
        if value == 1:
           text = "Вы победили!!"
           displayMessage(text, GOLD, screen, 30, screen_size, screen_size[1]*2//4)
        else:
           text = "Вы проиграли!!"
-          displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4) # Красный для поражения
+          displayMessage(text, RED, screen, 30, screen_size, screen_size[1]*2//4)
+    pygame.display.flip()
 
 
     # Инструкция по выходу
-    displayMessage("Нажмите Enter чтобы выйти в меню.", WHITE, screen, 20, screen_size,screen_size[1]*3//4)
+    displayMessage("Нажмите Enter чтобы выйти в меню.", WHITE, screen, 20, screen_size, screen_size[1] * 3 // 4)
 
 
     carryOn = True
