@@ -51,7 +51,7 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
         # Создаем отдельный прямоугольник для коллизий
-        self.collision_rect = pygame.Rect(0, 0, 6, 6) # Размер коллизии (настройте по необходимости)
+        self.collision_rect = pygame.Rect(0, 0, 10, 10) # Размер коллизии (настройте по необходимости)
         self.update_collision_rect()  # Обновляем позицию коллизии
 
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")
@@ -314,7 +314,7 @@ class Player(pygame.sprite.Sprite):
 
     def update_collision_rect(self):
         """Обновляет позицию прямоугольника коллизии."""
-        self.collision_rect.midbottom = self.rect.midbottom
+        self.collision_rect.center = (self.rect.center[0], self.rect.center[1]+7)
 
     def update_animation(self, dt, was_moving):
         """Обновление анимации игрока (движения)"""

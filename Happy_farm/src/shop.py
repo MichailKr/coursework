@@ -22,7 +22,7 @@ class Shop:
         # Позиция магазина - устанавливаем позицию по умолчанию
         # Позиция будет обновлена после загрузки карты
         self.shop_x, self.shop_y = 1000, 1000
-        self.shop_range = 100  # Радиус действия магазина
+        self.shop_range = 35  # Радиус действия магазина
         self.position_set = False  # Флаг для отслеживания установки позиции
         # Товары магазина
         self.shop_items = self.init_shop_items()
@@ -39,11 +39,9 @@ class Shop:
         """Устанавливает позицию магазина относительно точки спавна"""
         if not self.position_set:
             try:
-                spawn_point = self.game_manager.get_spawn_point()
-                if spawn_point:
-                    self.shop_x, self.shop_y = spawn_point[0] + 100, spawn_point[1] + 100
-                    self.position_set = True
-                    print(f"Позиция магазина установлена: ({self.shop_x}, {self.shop_y})")
+                self.shop_x, self.shop_y = 500, 1010
+                self.position_set = True
+                print(f"Позиция магазина установлена: ({self.shop_x}, {self.shop_y})")
             except AttributeError:
                 # Карта еще не загружена, используем позицию по умолчанию
                 pass
