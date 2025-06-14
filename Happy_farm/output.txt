@@ -102,8 +102,8 @@ if __name__ == "__main__":
 ==================== event_handler.py ====================
 
 import pygame
-from src.game_state import GameState
 
+from src.game_state import GameState
 
 class EventHandler:
     def __init__(self, game_manager):
@@ -124,54 +124,59 @@ class EventHandler:
             'fps_slider': pygame.Rect(300, 360, 200, 20),
             'back': pygame.Rect(0, 0, 200, 50)  # Кнопка "Назад"
         }
-
         self.dragging = None
 
     def update_button_positions(self, screen):
         """Обновление позиций кнопок меню"""
         screen_center_x = screen.get_width() // 2
-
         # Обновление позиций кнопок меню
         self.menu_buttons['play'].centerx = screen_center_x
         self.menu_buttons['play'].top = 250
-
         self.menu_buttons['settings'].centerx = screen_center_x
         self.menu_buttons['settings'].top = 320
-
         self.menu_buttons['exit'].centerx = screen_center_x
         self.menu_buttons['exit'].top = 390
-
         # Обновление позиции кнопки "Назад"
         self.settings_elements['back'].centerx = screen_center_x
         self.settings_elements['back'].bottom = screen.get_height() - 30
 
-    def handle_events(self):
-        """Обработка всех событий"""
+    # --- Измените метод handle_events ---
+    # Теперь этот метод принимает одно событие за раз
+    def handle_events(self, event): # Добавлен аргумент 'event'
+        """Обработка одного события Pygame."""
         screen = self.game_manager.screen_manager.get_screen()
-        self.update_button_positions(screen)
+        self.update_button_positions(screen) # Возможно, обновление позиций лучше делать в другом месте, но пока оставим здесь
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return False
+        # --- Удалите цикл for event in pygame.event.get(): ---
+        # События теперь получаются и передаются из GameManager
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if self.game_manager.state == GameState.GAME:
-                        self.game_manager.state = GameState.MENU
+        if event.type == pygame.QUIT:
+            return False # Сигнализируем GameManager о выходе из игры
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Левая кнопка мыши
-                    self.handle_mouse_down(event.pos)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.game_manager.state == GameState.GAME:
+                    self.game_manager.state = GameState.MENU
+            # TODO: Добавьте здесь обработку других клавиш, не связанных с инвентарем (например, движение игрока)
+            # if event.key == self.game_manager.settings['controls']['up']:
+            #      self.game_manager.player.move(0, -1)
+            # ... другие клавиши движения ...
 
-            if event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1:
-                    self.handle_mouse_up(event.pos)
 
-            if event.type == pygame.MOUSEMOTION:
-                if self.dragging:
-                    self.handle_mouse_motion(event.pos)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Левая кнопка мыши
+                self.handle_mouse_down(event.pos)
 
-        return True
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.handle_mouse_up(event.pos)
+
+        if event.type == pygame.MOUSEMOTION:
+            if self.dragging:
+                self.handle_mouse_motion(event.pos)
+
+        return True # Продолжаем игру
+    # --- Конец изменения ---
 
     def handle_mouse_down(self, pos):
         """Обработка нажатия кнопки мыши"""
@@ -200,7 +205,10 @@ class EventHandler:
             elif self.settings_elements['fullscreen'].collidepoint(pos):
                 self.toggle_fullscreen()
 
-        return True
+        # TODO: Возможно, здесь должна быть обработка кликов в игре, не связанных с инвентарем или UI
+        # Например, взаимодействие с объектами мира
+
+        return True # Этот return в handle_mouse_down не влияет на цикл событий, он для внутренней логики
 
     def handle_mouse_up(self, pos):
         """Обработка отпускания кнопки мыши"""
@@ -230,42 +238,44 @@ class EventHandler:
         self.game_manager.toggle_fullscreen()
 
 
-
 ==================== game_manager.py ====================
 
 import pygame
+from src.shop import Shop
 from src.game_state import GameState
 from src.screen_manager import ScreenManager
 from src.event_handler import EventHandler
 from src.render_manager import RenderManager
 from src.player import Player
 from src.camera import Camera
-from src.item import Tool
+from src.item import Tool, Item # Импортируем также базовый класс Item
 import pytmx
 import os
 import math
 import time
-
+from src.inventory_manager import InventoryManager
 
 class GameManager:
     def __init__(self):
         pygame.init()
         pygame.font.init()
+
         self.screen_manager = ScreenManager()
         self.event_handler = EventHandler(self)
         self.render_manager = RenderManager(self.screen_manager)
+
         self.state = GameState.MENU
         self.running = True
         self.paused = False
-        self.clock = pygame.time.Clock()
 
+        self.clock = pygame.time.Clock()
         self.clock_size = 75
         self.clock_bg = None
         self.clock_arrow = None
         self.clock_pos = None
 
         # игровое время
-        self.game_time = 0 # секунды
+        self.game_time = 300 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
 
         # затемнение
@@ -296,32 +306,94 @@ class GameManager:
             'large': pygame.font.Font(None, 48)
         }
 
-        # self.tools = {
-        #     'hoe': Tool('Мотыга', pygame.image.load('sprites/tools/hoe.png'), 'hoe'),
-        #     'axe': Tool('Топор', pygame.image.load('sprites/tools/axe.png'), 'axe'),
-        #     'wateringcan': Tool('Лейка', pygame.image.load('sprites/tools/wateringcan.png'), 'wateringcan')
-        # }
+        # Инициализация инструментов
+        self.tools = {} # Инициализируем пустой словарь инструментов
 
-        self.inventory_open = False
-        self.selected_item_index = 0
-        self.hotbar_slots = [None] * 8
-        self.inventory = [[None for _ in range(3)] for _ in range(8)]
+        # --- Загрузка изображений инструментов и создание объектов Tool ---
+        # Используем более надежный способ формирования пути
+        base_sprites_path = os.path.join("sprites", "player", "sprites_tools")
+        hoe_image_path = os.path.join(base_sprites_path, 'hoe.png')
+
+        try:
+             hoe_image = pygame.image.load(hoe_image_path).convert_alpha()
+             print(f"Изображение мотыги успешно загружено по пути: {hoe_image_path}")
+             self.tools['hoe'] = Tool('Мотыга', hoe_image, 'hoe')
+        except pygame.error as e:
+             print(f"Ошибка загрузки изображения мотыги: {e}")
+             print(f"Проверьте путь к файлу: {hoe_image_path}")
+        except Exception as e:
+             print(f"Произошла другая ошибка при создании объекта Tool для мотыги: {e}")
+
+
+        # Добавьте загрузку и создание объектов для других инструментов аналогично
+        # axe_image_path = os.path.join(base_sprites_path, 'axe.png')
+        # try:
+        #      axe_image = pygame.image.load(axe_image_path).convert_alpha()
+        #      self.tools['axe'] = Tool('Топор', axe_image, 'axe')
+        # except pygame.error as e:
+        #      print(f"Ошибка загрузки изображения топора: {e}")
+        #      print(f"Проверьте путь к файлу: {axe_image_path}")
+
+        self.inventory_manager = InventoryManager(self)
 
         self.all_sprites = pygame.sprite.Group()
         self.players = pygame.sprite.Group()
+        
         self.npcs = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
 
         # Загрузка карты
         self.map_loaded = False
+        self.tmx_data = None # Инициализируем до try/except
+
+        self.soil_layer = 'Песочек' # Будет содержать объект слоя TiledTileLayer
+        self.grass_layer = 'Травка' # Будет содержать объект слоя TiledTileLayer
+        self.dirt_tile_gid = None # Будет содержать GID тайла земли
+
+        # Слои коллизий (имена слоев из Tiled)
+        self.collision_layers_names = ["Коллизия лес", "Колилзия горок", "Дом", "Коллизия кусты","Коллизии Мосты", "Коллизия камней", "Коллизии река и Озеро"]
+        self.collision_layers = [] # Будет содержать объекты TiledTileLayer для коллизий
+
+
         try:
-            self.tmx_data = pytmx.load_pygame('maps/maps.tmx')
+            # Используем более надежный способ формирования пути к карте
+            map_path = os.path.join('maps', 'maps.tmx')
+            self.tmx_data = pytmx.load_pygame(map_path)
             self.map_loaded = True
-            print("Карта успешно загружена")
+            print(f"Карта успешно загружена по пути: {map_path}")
+
+            # Получаем объекты слоев после успешной загрузки карты
+            self.soil_layer = self.tmx_data.get_layer_by_name('Песочек')
+            self.grass_layer = self.tmx_data.get_layer_by_name('Травка')
+
+            # Получаем объекты слоев коллизий
+            for layer_name in self.collision_layers_names:
+                 layer = self.tmx_data.get_layer_by_name(layer_name)
+                 if layer and isinstance(layer, pytmx.TiledTileLayer):
+                      self.collision_layers.append(layer)
+                 else:
+                     print(f"Предупреждение: Слой коллизии '{layer_name}' не найден или не является тайловым слоем.")
+
+
+            # Получаем GID тайла земли по свойству
+            self.dirt_tile_gid = self.get_tile_gid_by_property('type', 'dirt')
+
+            # Проверки наличия слоев и GID
+            if not self.soil_layer:
+                print("Внимание: Слой 'Песочек' не найден в карте. Вспашка не будет работать корректно.")
+            if not self.grass_layer:
+                 print("Внимание: Слой 'Травка' не найден в карте. Вспашка не будет работать корректно.")
+            if self.dirt_tile_gid is None:
+                 print("Внимание: GID тайла земли не найден по свойству 'type'='dirt'. Вспашка не будет работать корректно.")
+
+        except FileNotFoundError:
+             print(f"Ошибка загрузки карты: Файл карты не найден по пути: {map_path}")
+             self.map_loaded = False
         except Exception as e:
             print(f"Ошибка загрузки карты: {e}")
             self.map_loaded = False
+
 
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
@@ -341,24 +413,56 @@ class GameManager:
         self.fps = 0
         self.fps_counter = 0
         self.fps_timer = pygame.time.get_ticks()
+        self.shop = Shop(self)
 
         print("GameManager инициализирован успешно")
 
-    def handle_events(self):
-        if not self.event_handler.handle_events():
-            self.running = False
-            return False
+    # --- Методы для мотыги и инвентаря ---
 
-        keys = pygame.key.get_pressed()
+    def get_tile_gid_by_property(self, property_name, property_value):
+        """
+        Вспомогательный метод для поиска GID тайла по его свойству,
+        используя get_tile_properties_by_gid.
+        """
+        if not self.tmx_data:
+            print("tmx_data не загружена в get_tile_gid_by_property")
+            return None
 
-        for i in range(8):
-            if keys[getattr(pygame, f'K_{i + 1}')]:
-                self.selected_item_index = i
+        # Собираем все уникальные GID, используемые в карте и тайлсетах
+        used_gids = set()
 
-        if keys[pygame.K_t]:
-            self.inventory_open = not self.inventory_open
+        # Собираем GIDы из слоев карты (это может быть полезно, но не обязательно для поиска по тайлсету)
+        # for layer in self.tmx_data.visible_layers:
+        #     if hasattr(layer, 'data'):
+        #         # Используем метод tiles() слоя, который итерирует по (x, y, gid)
+        #         for x, y, gid in layer.tiles():
+        #             if gid != 0:
+        #                 used_gids.add(gid)
 
-        return True
+        # Добавляем GIDы из всех тайлсетов - это основной способ найти GID по свойству тайлсета
+        for tileset in self.tmx_data.tilesets:
+            # Проверяем, что tileset имеет firstgid и tilecount
+            if hasattr(tileset, 'firstgid') and hasattr(tileset, 'tilecount'):
+                 # Итерируем по всем локальным ID тайлов в тайлсете
+                 for tile_id in range(tileset.tilecount):
+                      # Вычисляем глобальный GID
+                      gid = tileset.firstgid + tile_id
+                      used_gids.add(gid)
+
+
+        # Проверяем свойства для каждого уникального GID, используя get_tile_properties_by_gid
+        for gid in sorted(list(used_gids)): # Сортируем для предсказуемого порядка
+            # !!! ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ МЕТОД: get_tile_properties_by_gid !!!
+            tile_properties = self.tmx_data.get_tile_properties_by_gid(gid)
+
+            # Проверяем свойства тайла
+            if tile_properties and property_name in tile_properties and tile_properties[property_name] == property_value:
+                 print(f"  Найден тайл с нужным свойством: GID {gid}")
+                 return gid # Возвращаем глобальный GID
+
+        print(f"Не найден тайл со свойством '{property_name}'='{property_value}'")
+        return None
+
 
     def init_game_objects(self):
         spawn_point = self.get_spawn_point()
@@ -369,24 +473,151 @@ class GameManager:
             start_x = screen.get_width() // 2
             start_y = screen.get_height() // 2
 
+        # При создании игрока передаем ссылку на GameManager
+        # Важно: Игрок может нуждаться в ссылке на InventoryManager для использования предметов
         self.player = Player(self, start_x, start_y)
         self.all_sprites.add(self.player)
         self.players.add(self.player)
         print(f"Игрок создан на позиции ({start_x}, {start_y})")
 
+        # --- Добавляем мотыгу в инвентарь игрока через InventoryManager ---
+        if 'hoe' in self.tools:
+            print("Мотыга найдена в self.tools.")
+            # Используем InventoryManager для добавления предмета
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
+                # Добавляем мотыгу в первый слот хотбара (или другое место)
+                success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
+                if success:
+                    print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
+                else:
+                    print("Ошибка: Не удалось добавить мотыгу в инвентарь через InventoryManager.")
+            else:
+                 print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
+        else:
+            print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
+        # --- Конец блока изменения ---
+
+    def till_tile(self, tile_x, tile_y):
+        """
+        Изменяет тайл травы на тайл земли по указанным координатам.
+        """
+        print(f"Попытка вспахать клетку: ({tile_x}, {tile_y})") # Начало метода
+
+        if not self.tmx_data or not self.soil_layer or not isinstance(self.soil_layer, pytmx.TiledTileLayer) or \
+           not self.grass_layer or not isinstance(self.grass_layer, pytmx.TiledTileLayer) or self.dirt_tile_gid is None:
+            print("Ошибка в till_tile: Не все необходимые данные карты загружены или имеют правильный тип. Возврат.")
+            return
+
+        tile_width = self.tmx_data.tilewidth
+        tile_height = self.tmx_data.tileheight
+        map_width_tiles = self.tmx_data.width
+        map_height_tiles = self.tmx_data.height
+
+        # Проверяем границы карты
+        if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
+            print(f"Предупреждение в till_tile: Координаты ({tile_x}, {tile_y}) вне границ карты. Возврат.")
+            return
+
+        # Получаем GID тайла на слое травы по координатам
+        # Используем метод get_tile_gid, который получает GID на конкретной позиции слоя
+        # Доступ к данным слоя через .data (двумерный список GIDов)
+        # Индексирование: [y][x]
+        gid = self.grass_layer.data[tile_y][tile_x]
+        print(f"GID тайла на слое '{self.grass_layer.name}' по координатам ({tile_x}, {tile_y}): {gid}") # Отладочный вывод
+
+
+        if gid != 0: # Проверяем, что на этой клетке есть тайл (не пустая)
+            print(f"Найдена непустая клетка с GID: {gid}") # Отладочный вывод
+
+            # Получаем свойства тайла травы на этой позиции
+            try:
+                # Вручную находим индекс слоя grass_layer
+                grass_layer_index = -1
+                for i, layer in enumerate(self.tmx_data.layers):
+                    if layer is self.grass_layer:
+                        grass_layer_index = i
+                        break
+
+                if grass_layer_index == -1:
+                    print(f"Ошибка в till_tile: Объект слоя травы не найден в списке слоев карты. Возврат.")
+                    return
+
+                # Теперь вызываем get_tile_properties с индексом слоя
+                tile_properties = self.tmx_data.get_tile_properties(tile_x, tile_y, grass_layer_index)
+                print(f"Свойства тайла (GID {gid}): {tile_properties}") # Отладочный вывод
+
+
+            except Exception as e:
+                 print(f"Ошибка при получении свойств тайла травы в till_tile на ({tile_x}, {tile_y}): {e}")
+                 tile_properties = None # Устанавливаем свойства в None в случае ошибки
+
+
+            # Проверяем, является ли тайл травой (по свойству)
+            # Убедимся, что tile_properties не None и содержит нужный ключ
+            if tile_properties and isinstance(tile_properties, dict) and tile_properties.get('type') == 'grass':
+                print("Тайл является травой. Производим вспашку.") # Отладочный вывод
+
+                self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                print(f"Вспахана клетка: ({tile_x}, {tile_y})")
+
+            else:
+                 print(f"Тайл не является травой или не имеет нужного свойства. Свойства: {tile_properties}. Требуется: {{'type': 'grass'}}") # Отладочный вывод
+
+        else:
+             print("Клетка пустая (GID 0). Вспашка не требуется.") # Отладочный вывод
+
+    # --- Методы обработки событий и отрисовки ---
+
+    def handle_events(self):
+        """
+        Обработка всех событий Pygame и их распределение по соответствующим менеджерам.
+        Включает обработку общих событий, инвентаря и взаимодействия с магазином.
+        """
+        events = pygame.event.get()
+        keys = pygame.key.get_pressed()  # Получаем состояние клавиш
+
+        for event in events:
+            if event.type == pygame.QUIT:
+                self.running = False
+                return False
+
+            if not self.event_handler.handle_events(event):
+                self.running = False
+                return False
+
+            # --- Передача события игроку ---
+            if hasattr(self, 'player') and self.player:
+                self.player.handle_input(event)
+
+            # --- Передача события инвентарю ---
+            self.inventory_manager.handle_input(event)
+
+            # --- Обработка взаимодействия с магазином ---
+            if event.type == pygame.KEYDOWN:
+                if event.key == self.settings['controls']['interact']:
+                    if hasattr(self, 'shop') and isinstance(self.shop, Shop):
+                        # Убедитесь, что инвентарь закрыт при взаимодействии с магазином
+                        if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                            self.shop.toggle_shop()
+                            print("Магазин открыт/закрыт")
+                        elif self.inventory_manager.inventory_open and self.shop.is_open:
+                            pass  # Можно добавить логику для инвентаря магазина
+
+        # Вызов handle_input для магазина (если он открыт)
+        if hasattr(self, 'shop') and self.shop.is_open:
+            self.shop.handle_input(keys, events)
+
+        return True
+
     def update(self):
         """Обновляет состояние игры"""
         delta_time = self.clock.tick(self.settings['fps_limit']) / 1000.0
-
         if self.state == GameState.GAME and not self.paused:
-            # Сначала обновляем спрайты
+            # Сначала обновляем спрайты (включая игрока)
             self.all_sprites.update(delta_time)
-
             # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
-
             self.update_clock()
-
             # Подсчёт FPS
             self.fps_counter += 1
             current_time = pygame.time.get_ticks()
@@ -398,7 +629,6 @@ class GameManager:
     def draw(self):
         """Отрисовка текущего состояния игры"""
         screen = self.screen_manager.get_screen()
-
         if self.state == GameState.MENU:
             self.render_manager.draw_menu(self)
         elif self.state == GameState.SETTINGS:
@@ -406,87 +636,58 @@ class GameManager:
         elif self.state == GameState.GAME:
             # Очистка экрана
             screen.fill((50, 50, 50))  # Серый фон
-
             # Отрисовка только видимой части карты
             if self.map_loaded:
                 self.render_map(screen)
-
             # Отрисовка всех спрайтов
-            for sprite in self.all_sprites:
+            all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.bottom)
+            for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
-
             self.draw_clock(screen)
-
-            # Отрисовка интерфейса
-            self.draw_inventory_and_hotbar(screen)
-
+            # Отрисовка интерфейса (всегда поверх всего остального)
+            # --- Добавьте вызов отрисовки инвентаря из InventoryManager ---
+            self.inventory_manager.draw(screen)
+            # --- Конец блока добавления ---
+            self.shop.draw(screen)
+            self.player.draw_coins(screen)
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
             screen.blit(fps_text, (10, 10))
-
         # Обновление экрана
         pygame.display.flip()
-
-    def draw_inventory_and_hotbar(self, screen):
-        panel_width = len(self.hotbar_slots) * 60 + 20
-        panel_height = 70
-        panel_x = (screen.get_width() - panel_width) // 2
-        panel_y = screen.get_height() - panel_height - 10
-
-        pygame.draw.rect(screen, (50, 50, 50), (panel_x, panel_y, panel_width, panel_height))
-
-        for index, item in enumerate(self.hotbar_slots):
-            slot_x = panel_x + 10 + index * 60
-            slot_y = panel_y + 10
-
-            if index == self.selected_item_index:
-                pygame.draw.rect(screen, (255, 215, 0), (slot_x - 5, slot_y - 5, 50 + 10, 50 + 10), 3)
-
-            pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, 50, 50))
-
-            if item:
-                item_surface = pygame.Surface((40, 40))
-                item_surface.fill((0, 255, 0))
-                screen.blit(item_surface, (slot_x + 5, slot_y + 5))
-
-        if self.inventory_open:
-            inventory_width = 3 * 70 + 20
-            inventory_height = 8 * 70 + 20
-            inventory_x = (screen.get_width() - inventory_width) // 2
-            inventory_y = (screen.get_height() - inventory_height) // 2
-
-            pygame.draw.rect(screen, (50, 50, 50), (inventory_x, inventory_y, inventory_width, inventory_height))
-
-            for row in range(8):
-                for col in range(3):
-                    slot_x = inventory_x + 10 + col * 70
-                    slot_y = inventory_y + 10 + row * 70
-
-                    pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, 60, 60))
-
-                    if self.inventory[row][col]:
-                        item_surface = pygame.Surface((40, 40))
-                        item_surface.fill((0, 0, 255))
-                        screen.blit(item_surface, (slot_x + 10, slot_y + 10))
 
     def init_clock(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
-
         offset = 10
-
         self.clock_pos = (screen_width - self.clock_size - offset, offset)
 
+        # Загрузка изображений часов
         try:
-            self.clock_bg = pygame.image.load("sprites/clock/clock_bg.png").convert_alpha()
-            self.clock_arrow = pygame.image.load("sprites/clock/clock_arrow.png").convert_alpha()
-        except:
+            clock_bg_path = os.path.join("sprites", "clock", "clock_bg.png")
+            clock_arrow_path = os.path.join("sprites", "clock", "clock_arrow.png")
+            self.clock_bg = pygame.image.load(clock_bg_path).convert_alpha()
+            self.clock_arrow = pygame.image.load(clock_arrow_path).convert_alpha()
+            print("Изображения часов успешно загружены.")
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображений часов: {e}")
+            print("Создаются заглушки для часов.")
+            # Создаем заглушки, если изображения не найдены
             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
                             (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
+        except Exception as e:
+             print(f"Произошла другая ошибка при инициализации часов: {e}")
+             # Создаем заглушки в случае других ошибок
+             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
+             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
+                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
+
 
         # если нужен будет рескейл
         # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
@@ -495,68 +696,102 @@ class GameManager:
         self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
         self.night_overlay.fill((0, 0, 0, 180))
 
+
     def draw_clock(self, screen):
-        screen.blit(self.clock_bg, self.clock_pos)
+        if self.clock_bg: # Проверяем, что изображение фона часов загружено
+            screen.blit(self.clock_bg, self.clock_pos)
 
-        angle = math.radians(self.game_time * -0.5)
+            if self.clock_arrow: # Проверяем, что изображение стрелки часов загружено
+                angle = math.radians(self.game_time * -0.5) # Угол в радианах (умножаем на -0.5 для вращения по часовой стрелке)
+                # Вращаем стрелку
+                rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
+                # Получаем прямоугольник повернутой стрелки и центрируем его по центру фона часов
+                arrow_rect = rotated_arrow.get_rect(center=(
+                    self.clock_pos[0] + self.clock_size // 2,
+                    self.clock_pos[1] + self.clock_size // 2
+                ))
+                screen.blit(rotated_arrow, arrow_rect)
+            else:
+                 print("Предупреждение: Изображение стрелки часов не загружено.")
 
-        rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
-        arrow_rect = rotated_arrow.get_rect(center=(
-            self.clock_pos[0] + self.clock_size // 2,
-            self.clock_pos[1] + self.clock_size // 2
-        ))
-        screen.blit(rotated_arrow, arrow_rect)
+        else:
+            print("Предупреждение: Изображение фона часов не загружено.")
 
-        if self.is_night:
+
+        # Отрисовка затемнения (ночи)
+        if self.is_night and self.night_overlay: # Проверяем наличие night_overlay
             screen.blit(self.night_overlay, (0, 0))
+        elif self.is_night and not self.night_overlay:
+            print("Предупреждение: night_overlay не инициализирован, но is_night = True.")
+
 
     def update_clock(self):
         # для дебага
         # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
 
         current_time = time.time()
+        # Обновляем игровое время каждую секунду реального времени
         if current_time - self.last_time_update >= 1:
-            self.game_time += 1
+            self.game_time += 1 # Увеличиваем на 1 секунду
             self.last_time_update = current_time
 
-        if self.game_time >= 720:
-            self.game_time = 0
+        # Пример: день 12 минут (720 секунд) игрового времени = 12 реальных минут
+        # 12 игровых часов = 720 секунд игрового времени
+        # 1 игровой час = 60 секунд игрового времени
 
-        self.is_night = (self.game_time // 60) % 12 == 11
+        max_game_time = 720 # Максимальное игровое время в цикле
+
+        if self.game_time >= max_game_time:
+            self.game_time = 0 # Сбрасываем игровое время в начало нового дня
+
+        # Пример: ночь с 11-го до 5-го часа (по циферблату)
+        # 11-й час начинается с (11 * 60) = 660 секунды
+        # 5-й час заканчивается в (5 * 60) = 300 секунд (на следующий день)
+        # То есть ночь с 660 до 720 (конец дня) и с 0 до 300 (начало дня)
+        self.is_night = (self.game_time >= 660) or (self.game_time < 300) # Исправлено условие для начала дня
 
     def render_map(self, screen):
         """Отрисовка карты"""
-        if not self.map_loaded:
+        if not self.map_loaded or not self.tmx_data:
             return
+
         # Получаем смещение камеры
         camera_offset = self.camera.offset
+
         # Размер тайла
         tile_width = self.tmx_data.tilewidth
         tile_height = self.tmx_data.tileheight
-        # Вычисляем видимую область в тайлах
+
+        # Вычисляем видимую область в тайлах (с небольшим запасом)
         start_x = int(camera_offset.x) // tile_width
         end_x = start_x + (screen.get_width() // tile_width) + 2
         start_y = int(camera_offset.y) // tile_height
         end_y = start_y + (screen.get_height() // tile_height) + 2
+
         # Ограничиваем индексы границами карты
         start_x = max(0, start_x)
         start_y = max(0, start_y)
         end_x = min(self.tmx_data.width, end_x)
         end_y = min(self.tmx_data.height, end_y)
-        # Отрисовка видимых тайлов
+
+        # Отрисовка видимых тайлов слоев с данными
         for layer in self.tmx_data.visible_layers:
-            if hasattr(layer, 'data'):
-                for y in range(start_y, end_y):
-                    for x in range(start_x, end_x):
-                        tile = layer.data[y][x]
-                        if tile:
-                            # Получаем изображение тайла
-                            tile_image = self.tmx_data.get_tile_image_by_gid(tile)
-                            if tile_image:
-                                # Вычисляем позицию на экране
-                                screen_x = x * tile_width - int(camera_offset.x)
-                                screen_y = y * tile_height - int(camera_offset.y)
-                                screen.blit(tile_image, (screen_x, screen_y))
+            # Отрисовываем только тайловые слои с данными
+            if isinstance(layer, pytmx.TiledTileLayer): # Проверяем, что это тайловый слой
+                 for y in range(start_y, end_y):
+                     for x in range(start_x, end_x):
+                         # Используем .tile для доступа к GID на позиции (x, y) в слое
+                         gid = layer.data[y][x] # Исправлено: доступ к данным слоя через .tile
+
+                         if gid != 0: # Проверяем, что это не пустая клетка
+                             # Получаем изображение тайла по GID
+                             tile_image = self.tmx_data.get_tile_image_by_gid(gid)
+
+                             if tile_image:
+                                 # Вычисляем позицию на экране
+                                 screen_x = x * tile_width - int(camera_offset.x)
+                                 screen_y = y * tile_height - int(camera_offset.y)
+                                 screen.blit(tile_image, (screen_x, screen_y))
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
@@ -567,8 +802,7 @@ class GameManager:
             map_width = self.tmx_data.width * self.tmx_data.tilewidth
             map_height = self.tmx_data.height * self.tmx_data.tileheight
             self.camera.set_map_size(map_width, map_height)
-            self.init_clock(screen)
-
+            self.init_clock(screen) # Переинициализируем часы после смены размера экрана
         print(f"Переключен режим экрана, новые размеры: {screen.get_width()}x{screen.get_height()}")
 
     def set_sound_volume(self, volume):
@@ -590,18 +824,25 @@ class GameManager:
         while self.running:
             self.handle_events()
             self.update()
-            self.draw()
+            self.draw() # Метод draw теперь отвечает за отрисовку изменений
+
         self.save_settings()
         pygame.quit()
 
     def get_spawn_point(self):
-        if self.map_loaded:
+        """Ищет точку спавна игрока на слое объектов карты."""
+        if self.map_loaded and self.tmx_data:
             for layer in self.tmx_data.layers:
-                if hasattr(layer, 'objects'):
+                # Проверяем, является ли слой слоем объектов
+                if isinstance(layer, pytmx.TiledObjectGroup):
                     for obj in layer:
-                        if hasattr(obj, 'type') and (obj.type == 'spawn' or obj.name == 'player_spawn'):
+                        # Проверяем свойства объекта для определения точки спавна
+                        if hasattr(obj, 'type') and obj.type == 'spawn' or \
+                           hasattr(obj, 'name') and obj.name == 'player_spawn':
+                            print(f"Найдена точка спавна игрока на ({obj.x}, {obj.y})")
                             return obj.x, obj.y
-        return None
+        print("Предупреждение: Точка спавна игрока не найдена на карте. Игрок будет размещен по центру экрана.")
+        return None # Возвращаем None, если точка спавна не найдена
 
     def reset_game(self):
         self.all_sprites.empty()
@@ -609,10 +850,56 @@ class GameManager:
         self.npcs.empty()
         self.obstacles.empty()
         self.items.empty()
-        self.init_game_objects()
+        self.init_game_objects() # Повторно инициализируем объекты игры
         self.state = GameState.MENU
         self.paused = False
         print("Игра сброшена в начальное состояние")
+
+    def check_collision(self, rect):
+        """
+        Проверяет коллизии данного прямоугольника с тайлами на слоях коллизий.
+        Принимает прямоугольник (обычно self.player.collision_rect).
+        """
+        if not self.map_loaded or not self.tmx_data or not self.collision_layers:
+             return False # Нет карты, данных или слоев коллизий
+
+        tile_width = self.tmx_data.tilewidth
+        tile_height = self.tmx_data.tileheight
+
+        for layer in self.collision_layers:
+            # Итерируем по тайлам в пределах видимой области прямоугольника коллизии
+            # Определяем область в тайлах, которую пересекает прямоугольник
+            start_x = int(rect.left // tile_width)
+            end_x = int(rect.right // tile_width) + 1
+            start_y = int(rect.top // tile_height)
+            end_y = int(rect.bottom // tile_height) + 1
+
+            # Ограничиваем область границами слоя
+            start_x = max(0, start_x)
+            start_y = max(0, start_y)
+            end_x = min(layer.width, end_x)
+            end_y = min(layer.height, end_y)
+
+
+            for y in range(start_y, end_y):
+                for x in range(start_x, end_x):
+                     # Используем .tile для доступа к GID на позиции (x, y) в слое
+                     gid = layer.data[y][x] # Исправлено: доступ к данным слоя через .tile
+
+                     if gid != 0: # Если тайл не пустой, это коллизия
+                        # Создаем прямоугольник для тайла коллизии
+                        tile_rect = pygame.Rect(
+                            x * tile_width,
+                            y * tile_height,
+                            tile_width,
+                            tile_height,
+                        )
+                        # Проверяем пересечение прямоугольников
+                        if rect.colliderect(tile_rect):
+                            # print(f"Коллизия с тайлом на ({x}, {y}) на слое {layer.name}") # Отладочный вывод
+                            return True # Найдена коллизия
+
+        return False # Коллизий не найдено
 
 
 ==================== game_state.py ====================
@@ -627,29 +914,534 @@ class GameState(Enum):
 
 
 
+==================== inventory_manager.py ====================
+
+import pygame
+from src.item import Item, Tool # Убедитесь, что путь к Item и Tool правильный
+
+class InventoryManager:
+    def __init__(self, game_manager):
+        self.game_manager = game_manager  # Ссылка на GameManager для доступа к другим частям игры
+
+        self.inventory_open = False
+        self.selected_item_index = 0 # Индекс выбранного слота в хотбаре
+        self.hotbar_slots = [None] * 8 # Список для хотбара (8 слотов)
+        self.inventory = [[None for _ in range(3)] for _ in range(6)] # Основной инвентарь (6x3 слота)
+
+        # Перетаскивание предметов
+        self.dragging_item = None
+        self.drag_start_slot = None # Содержит ('hotbar', index) или ('inventory', row, col)
+        self.drag_offset = (0, 0)
+
+        # Размеры и позиции для отрисовки (можно вынести в константы или получать из GameManager)
+        self.hotbar_slot_size = 50
+        self.hotbar_slot_padding = 10
+        self.hotbar_panel_padding = 10
+
+        self.inventory_slot_size = 60
+        self.inventory_slot_padding = 10
+        self.inventory_cols = 3
+        self.inventory_rows = 6
+        self.inventory_panel_padding = 10 # Добавлена константа для отступа панели инвентаря
+
+    def add_item_to_inventory(self, item, slot_index=None, row=None, col=None):
+        """
+        Добавляет предмет в инвентарь или хотбар.
+        Если slot_index указан, добавляет в хотбар.
+        Если row и col указаны, добавляет в основной инвентарь.
+        Если ничего не указано, пытается найти свободный слот.
+        """
+        if slot_index is not None:
+            if 0 <= slot_index < len(self.hotbar_slots):
+                if self.hotbar_slots[slot_index] is None:
+                    self.hotbar_slots[slot_index] = item
+                    print(f"Предмет {item.name} добавлен в хотбар слот {slot_index}")
+                    return True
+                else:
+                    print(f"Хотбар слот {slot_index} занят.")
+                    return False
+            else:
+                print(f"Неверный индекс хотбар слота: {slot_index}")
+                return False
+        elif row is not None and col is not None:
+            if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
+                if self.inventory[row][col] is None:
+                    self.inventory[row][col] = item
+                    print(f"Предмет {item.name} добавлен в инвентарь слот ({row}, {col})")
+                    return True
+                else:
+                    print(f"Инвентарь слот ({row}, {col}) занят.")
+                    return False
+            else:
+                print(f"Неверные координаты инвентарь слота: ({row}, {col})")
+                return False
+        else:
+            # Поиск свободного слота в инвентаре
+            for r in range(self.inventory_rows):
+                for c in range(self.inventory_cols):
+                    if self.inventory[r][c] is None:
+                        self.inventory[r][c] = item
+                        print(f"Предмет {item.name} добавлен в инвентарь слот ({r}, {c})")
+                        return True
+            # Поиск свободного слота в хотбаре (после основного инвентаря)
+            for i in range(len(self.hotbar_slots)):
+                if self.hotbar_slots[i] is None:
+                    self.hotbar_slots[i] = item
+                    print(f"Предмет {item.name} добавлен в хотбар слот {i}")
+                    return True
+
+
+        print(f"Не удалось добавить предмет {item.name}: нет свободных слотов.")
+        return False
+
+    def handle_input(self, event):
+        """Обработка событий ввода, связанных с инвентарем (открытие/закрытие, выбор слота, перетаскивание)"""
+
+        # --- Отладочные принты для проверки принимаемых событий ---
+        # print(f"InventoryManager received event type: {event.type}")
+        # if event.type == pygame.KEYDOWN:
+        #     print(f"Key pressed: {event.key}")
+        #     print(f"Expected inventory key: {self.game_manager.settings['controls']['inventory']}")
+        # elif event.type == pygame.MOUSEBUTTONDOWN:
+        #      print(f"Mouse button down at {event.pos}, button: {event.button}")
+        # elif event.type == pygame.MOUSEBUTTONUP:
+        #      print(f"Mouse button up at {event.pos}, button: {event.button}")
+        # elif event.type == pygame.MOUSEMOTION:
+        #      print(f"Mouse motion to {event.pos}")
+        # --- Конец отладочных принтов ---
+
+
+        if event.type == pygame.KEYDOWN:
+            # Обработка открытия/закрытия инвентаря клавишей
+            if event.key == self.game_manager.settings['controls']['inventory']:
+                self.inventory_open = not self.inventory_open
+                # print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}") # Отладочный принт
+
+            # Обработка выбора слота хотбара клавишами 1-8 (если инвентарь закрыт)
+            # Этот блок у вас уже работает
+            if not self.inventory_open:
+                for i in range(8):
+                    if event.key == getattr(pygame, f'K_{i + 1}'):
+                        self.selected_item_index = i
+                        # print(f"Выбран слот хотбара: {self.selected_item_index}") # Отладочный принт
+                        break
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Левая кнопка мыши
+                mouse_pos = event.pos
+                # Проверяем клик только если инвентарь открыт (для перетаскивания)
+                if self.inventory_open:
+                    item, slot_info = self.get_item_from_click(mouse_pos)
+                    if item:
+                        self.dragging_item = item
+                        self.drag_start_slot = slot_info
+                        item_image_rect = self.get_item_image_rect(item, slot_info)
+                        if item_image_rect:
+                            self.drag_offset = (mouse_pos[0] - item_image_rect.x, mouse_pos[1] - item_image_rect.y)
+                        else:
+                            self.drag_offset = (0, 0)
+                        self._remove_item_from_slot(slot_info)
+                        # print(f"Начато перетаскивание предмета {item.name} из {slot_info}") # Отладочный принт
+                # TODO: Добавить здесь обработку кликов вне инвентаря (для использования предмета в мире),
+                # если эта логика не в Player.handle_input
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:  # Левая кнопка мыши
+                if self.dragging_item:
+                    mouse_pos = event.pos
+                    target_slot_info = self.get_slot_from_click(mouse_pos)
+
+                    if target_slot_info:
+                        # print(f"Предмет {self.dragging_item.name} брошен в {target_slot_info}") # Отладочный принт
+                        success = self.place_item_in_slot(self.dragging_item, target_slot_info, self.drag_start_slot)
+                        if not success:
+                            # print(f"Не удалось поместить предмет {self.dragging_item.name} в {target_slot_info}. Возврат в исходный слот {self.drag_start_slot}.") # Отладочный принт
+                            self.place_item_in_slot(self.dragging_item, self.drag_start_slot) # Вернуть в исходный слот
+                    else:
+                        # Предмет брошен вне инвентаря (логика выброса)
+                        print(f"Предмет {self.dragging_item.name} выброшен.")
+                        # Здесь можно добавить логику для создания объекта Item на земле
+
+                    self.dragging_item = None
+                    self.drag_start_slot = None
+                    self.drag_offset = (0, 0)
+                # TODO: Добавить здесь обработку отпускания кликов вне инвентаря
+
+        elif event.type == pygame.MOUSEMOTION:
+             # --- Раскомментированный блок для обработки движения мыши ---
+             if self.dragging_item:
+                 # Позиция перетаскиваемого предмета обновляется при отрисовке.
+                 # Здесь можно добавить логику для проверки наведения на слоты,
+                 # если хотите визуально подсвечивать целевой слот.
+                 pass
+             # --- Конец раскомментированного блока ---
+
+
+    def get_item_from_click(self, mouse_pos):
+        """
+        Определяет, был ли клик по предмету в инвентаре или хотбаре.
+        Возвращает (предмет, информация_о_слоте) или (None, None).
+        """
+        screen = self.game_manager.screen_manager.get_screen()
+
+        # Проверка хотбара
+        panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
+        panel_height = self.hotbar_slot_size + 2 * self.hotbar_panel_padding
+        panel_x = (screen.get_width() - panel_width) // 2
+        panel_y = screen.get_height() - panel_height - 10
+
+        for index, item in enumerate(self.hotbar_slots):
+            slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
+            slot_y = panel_y + self.hotbar_panel_padding
+            slot_rect = pygame.Rect(slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size)
+
+            if slot_rect.collidepoint(mouse_pos) and item:
+                return (item, ('hotbar', index))
+
+        # Проверка основного инвентаря
+        if self.inventory_open: # Проверяем клик по инвентарю только если он открыт
+            inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_x = (screen.get_width() - inventory_width) // 2
+            inventory_y = (screen.get_height() - inventory_height) // 2
+
+            for row in range(self.inventory_rows):
+                for col in range(self.inventory_cols):
+                    slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
+                    slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
+                    slot_rect = pygame.Rect(slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size)
+
+                    if slot_rect.collidepoint(mouse_pos):
+                        item = self.inventory[row][col]
+                        if item:
+                            return (item, ('inventory', row, col))
+
+        return (None, None)
+
+    def get_slot_from_click(self, mouse_pos):
+        """
+        Определяет, в какой слот инвентаря или хотбара был клик.
+        Возвращает информация_о_слоте или None.
+        """
+        screen = self.game_manager.screen_manager.get_screen()
+
+        # Проверка хотбара
+        panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
+        panel_height = self.hotbar_slot_size + 2 * self.hotbar_panel_padding
+        panel_x = (screen.get_width() - panel_width) // 2
+        panel_y = screen.get_height() - panel_height - 10
+
+        for index in range(len(self.hotbar_slots)):
+            slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
+            slot_y = panel_y + self.hotbar_panel_padding
+            slot_rect = pygame.Rect(slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size)
+
+            if slot_rect.collidepoint(mouse_pos):
+                return ('hotbar', index)
+
+        # Проверка основного инвентаря
+        if self.inventory_open: # Проверяем клик по инвентарю только если он открыт
+            inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_x = (screen.get_width() - inventory_width) // 2
+            inventory_y = (screen.get_height() - inventory_height) // 2
+
+            for row in range(self.inventory_rows):
+                for col in range(self.inventory_cols):
+                    slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
+                    slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
+                    slot_rect = pygame.Rect(slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size)
+
+                    if slot_rect.collidepoint(mouse_pos):
+                        return ('inventory', row, col)
+
+        return None
+
+    def get_item_image_rect(self, item, slot_info):
+        """
+        Возвращает pygame.Rect изображения предмета в заданном слоте для расчета смещения.
+        Использует те же координаты и размеры, что и при отрисовке.
+        """
+        screen = self.game_manager.screen_manager.get_screen()
+
+        # Убедитесь, что item является экземпляром Item и имеет изображение
+        if not isinstance(item, Item) or not hasattr(item, 'image') or not item.image:
+            return None # Возвращаем None, если предмет невалиден для отрисовки
+
+        item_image = item.image
+        img_width, img_height = item_image.get_size()
+
+        if slot_info[0] == 'hotbar':
+            index = slot_info[1]
+            panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
+            panel_height = self.hotbar_slot_size + 2 * self.hotbar_panel_padding
+            panel_x = (screen.get_width() - panel_width) // 2
+            panel_y = screen.get_height() - panel_height - 10
+            slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
+            slot_y = panel_y + self.hotbar_panel_padding
+
+            item_slot_size = 40 # Размер для отрисовки в слоте хотбара
+
+            scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
+
+            img_x = slot_x + (self.hotbar_slot_size - scaled_width) // 2
+            img_y = slot_y + (self.hotbar_slot_size - scaled_height) // 2
+
+            return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
+
+        elif slot_info[0] == 'inventory':
+            row, col = slot_info[1], slot_info[2]
+            inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_x = (screen.get_width() - inventory_width) // 2
+            inventory_y = (screen.get_height() - inventory_height) // 2
+            slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
+            slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
+
+            item_slot_size = 50 # Размер для отрисовки в слоте инвентаря
+
+            scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
+
+            img_x = slot_x + (self.inventory_slot_size - scaled_width) // 2
+            img_y = slot_y + (self.inventory_slot_size - scaled_height) // 2
+
+            return pygame.Rect(img_x, img_y, scaled_width, scaled_height)
+
+        return None # Неизвестный тип слота
+
+    def place_item_in_slot(self, item, target_slot_info, source_slot_info=None):
+        """
+        Помещает предмет в целевой слот.
+        Возвращает True при успехе, False при неудаче.
+        Обрабатывает обмен и стакание (пока простая версия).
+        """
+        if not item:
+            # print("Попытка поместить None.") # Отладочный принт
+            return False
+
+        target_type = target_slot_info[0]
+        target_index_or_coords = target_slot_info[1:]
+
+        # Получаем текущий предмет в целевом слоте
+        current_item_in_target = None
+        if target_type == 'hotbar':
+            target_index = target_index_or_coords[0]
+            if 0 <= target_index < len(self.hotbar_slots):
+                 current_item_in_target = self.hotbar_slots[target_index]
+            else:
+                print(f"Неверный целевой хотбар слот: {target_slot_info}")
+                return False
+        elif target_type == 'inventory':
+            target_row, target_col = target_index_or_coords
+            if 0 <= target_row < self.inventory_rows and 0 <= target_col < self.inventory_cols:
+                 current_item_in_target = self.inventory[target_row][target_col]
+            else:
+                 print(f"Неверный целевой инвентарь слот: {target_slot_info}")
+                 return False
+        else:
+            print(f"Неизвестный целевой слот: {target_slot_info}")
+            return False
+
+        # Логика размещения
+        if current_item_in_target is None:
+            # Целевой слот пуст - просто помещаем предмет
+            if target_type == 'hotbar':
+                self.hotbar_slots[target_index] = item
+            elif target_type == 'inventory':
+                self.inventory[target_row][target_col] = item
+            # print(f"Предмет {item.name} помещен в целевой слот {target_slot_info}.") # Отладочный принт
+            return True
+
+        else:
+            # Целевой слот занят - попытка обмена или стакания
+            # Простая логика обмена: если предмет в целевом слоте не None, меняем местами
+            # print(f"Целевой слот {target_slot_info} занят предметом {current_item_in_target.name}. Попытка обмена.") # Отладочный принт
+
+            if source_slot_info:
+                # Удаляем предмет из исходного слота перед обменом
+                 self._remove_item_from_slot(source_slot_info)
+                 # Помещаем текущий предмет из целевого слота в исходный
+                 self._place_item_in_slot_direct(current_item_in_target, source_slot_info)
+
+            # Помещаем перетаскиваемый предмет в целевой слот
+            if target_type == 'hotbar':
+                self.hotbar_slots[target_index] = item
+            elif target_type == 'inventory':
+                self.inventory[target_row][target_col] = item
+
+            # print(f"Предметы успешно обменены между {source_slot_info} и {target_slot_info}.") # Отладочный принт
+            return True # Обмен считается успешным
+
+        # TODO: Добавить логику стакания предметов (если предметы стакуемые и одного типа)
+
+    def _remove_item_from_slot(self, slot_info):
+        """Вспомогательный метод для удаления предмета из слота."""
+        slot_type = slot_info[0]
+        if slot_type == 'hotbar':
+            index = slot_info[1]
+            if 0 <= index < len(self.hotbar_slots):
+                self.hotbar_slots[index] = None
+                # print(f"Предмет удален из хотбар слота {index}.") # Отладочный принт
+            # else:
+                # print(f"Ошибка удаления: Неверный индекс хотбар слота {index}") # Отладочный принт
+
+        elif slot_type == 'inventory':
+            row, col = slot_info[1], slot_info[2]
+            if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
+                 self.inventory[row][col] = None
+                 # print(f"Предмет удален из инвентарь слота ({row}, {col}).") # Отладочный принт
+            # else:
+                # print(f"Ошибка удаления: Неверные координаты инвентарь слота ({row}, {col})") # Отладочный принт
+
+    def _place_item_in_slot_direct(self, item, slot_info):
+        """Вспомогательный метод для прямого помещения предмета в слот (без проверок)."""
+        if not item:
+            # print("Попытка напрямую поместить None.") # Отладочный принт
+            return
+
+        slot_type = slot_info[0]
+        if slot_type == 'hotbar':
+            index = slot_info[1]
+            if 0 <= index < len(self.hotbar_slots):
+                self.hotbar_slots[index] = item
+                # print(f"Предмет {item.name} напрямую помещен в хотбар слот {index}.") # Отладочный принт
+            # else:
+                # print(f"Ошибка прямого размещения: Неверный индекс хотбар слота {index}") # Отладочный принт
+
+        elif slot_type == 'inventory':
+            row, col = slot_info[1], slot_info[2]
+            if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
+                 self.inventory[row][col] = item
+                 # print(f"Предмет {item.name} напрямую помещен в инвентарь слот ({row}, {col}).") # Отладочный принт
+            # else:
+                # print(f"Ошибка прямого размещения: Неверные координаты инвентаря слота ({row}, {col})") # Отладочный принт
+
+    def draw(self, screen):
+        """Отрисовка инвентаря и хотбара"""
+
+        # Отрисовка панели хотбара
+        panel_width = len(self.hotbar_slots) * (self.hotbar_slot_size + self.hotbar_slot_padding) + self.hotbar_panel_padding
+        panel_height = self.hotbar_slot_size + 2 * self.hotbar_panel_padding
+        panel_x = (screen.get_width() - panel_width) // 2
+        panel_y = screen.get_height() - panel_height - 10
+
+        pygame.draw.rect(screen, (50, 50, 50), (panel_x, panel_y, panel_width, panel_height), border_radius=10)
+
+        for index, item in enumerate(self.hotbar_slots):
+            slot_x = panel_x + self.hotbar_panel_padding + index * (self.hotbar_slot_size + self.hotbar_slot_padding)
+            slot_y = panel_y + self.hotbar_panel_padding
+
+            # Отрисовка рамки выбранного слота
+            if index == self.selected_item_index:
+                # Увеличиваем размер рамки и сдвигаем ее для центрирования вокруг слота
+                border_size = 3 # Толщина рамки
+                border_offset = 5 # Отступ рамки от слота
+                pygame.draw.rect(screen, (255, 215, 0),
+                                 (slot_x - border_offset, slot_y - border_offset,
+                                  self.hotbar_slot_size + 2 * border_offset, self.hotbar_slot_size + 2 * border_offset),
+                                 border_size, border_radius=10)
+
+
+            # Отрисовка фона слота
+            pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, self.hotbar_slot_size, self.hotbar_slot_size), border_radius=5)
+
+            # Отрисовка предмета в слоте (если он не перетаскивается)
+            if item and item is not self.dragging_item:
+                self._draw_item_in_slot(screen, item, slot_x, slot_y, self.hotbar_slot_size, item_slot_size=40) # item_slot_size из вашей отрисовки
+
+        # --- Отрисовка инвентаря (если открыт) ---
+        if self.inventory_open: # Проверяем флаг inventory_open перед отрисовкой основного инвентаря
+
+            inventory_width = self.inventory_cols * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_height = self.inventory_rows * (self.inventory_slot_size + self.inventory_slot_padding) + self.inventory_panel_padding
+            inventory_x = (screen.get_width() - inventory_width) // 2
+            inventory_y = (screen.get_height() - inventory_height) // 2 # Позиция по Y для центрирования инвентаря
+
+            pygame.draw.rect(screen, (50, 50, 50), (inventory_x, inventory_y, inventory_width, inventory_height), border_radius=10)
+
+            for row in range(self.inventory_rows):
+                for col in range(self.inventory_cols):
+                    slot_x = inventory_x + self.inventory_panel_padding + col * (self.inventory_slot_size + self.inventory_slot_padding)
+                    slot_y = inventory_y + self.inventory_panel_padding + row * (self.inventory_slot_size + self.inventory_slot_padding)
+
+                    # Отрисовка фона слота инвентаря
+                    pygame.draw.rect(screen, (100, 100, 100), (slot_x, slot_y, self.inventory_slot_size, self.inventory_slot_size), border_radius=5)
+
+                    item = self.inventory[row][col]
+
+                    # Отрисовка предмета в слоте (если он не перетаскивается)
+                    if item and item is not self.dragging_item:
+                        self._draw_item_in_slot(screen, item, slot_x, slot_y, self.inventory_slot_size, item_slot_size=50) # item_slot_size из вашей отрисовки
+        # --- Конец отрисовки инвентаря ---
+
+
+        # Отрисовка перетаскиваемого предмета (всегда поверх всего)
+        if self.dragging_item and self.dragging_item.image:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            # Вычисляем позицию для отрисовки перетаскиваемого предмета с учетом смещения
+            draw_x = mouse_x - self.drag_offset[0]
+            draw_y = mouse_y - self.drag_offset[1]
+
+            # Масштабируем изображение предмета для перетаскивания (используем размер инвентарного слота для единообразия)
+            item_image = self.dragging_item.image
+            img_width, img_height = item_image.get_size()
+            drag_size = 50 # Размер для перетаскивания (можно сделать настраиваемым)
+            scale_factor = min(drag_size / img_width, drag_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
+
+            # Масштабируем изображение
+            scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
+
+            screen.blit(scaled_image, (draw_x, draw_y))
+
+    def _draw_item_in_slot(self, screen, item, slot_x, slot_y, slot_size, item_slot_size):
+        """Вспомогательный метод для отрисовки предмета внутри слота."""
+        if isinstance(item, Item) and hasattr(item, 'image') and item.image:
+             item_image = item.image
+             img_width, img_height = item_image.get_size()
+             scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+             scaled_width = int(img_width * scale_factor)
+             scaled_height = int(img_height * scale_factor)
+
+             scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
+
+             img_x = slot_x + (slot_size - scaled_width) // 2
+             img_y = slot_y + (slot_size - scaled_height) // 2
+
+             screen.blit(scaled_image, (img_x, img_y))
+        else:
+             # Заглушка для отсутствующего изображения/неправильного объекта
+             dummy = pygame.Surface((item_slot_size, item_slot_size))
+             dummy.fill((255, 0, 0)) # Красная заглушка
+             screen.blit(dummy, (slot_x + (slot_size - item_slot_size) // 2, slot_y + (slot_size - item_slot_size) // 2))
+
+
 ==================== item.py ====================
 
 import pygame
 
-
 class Item(pygame.sprite.Sprite):
-    def __init__(self, name, image, tool_type):
+    def __init__(self, name, image, item_type): # Изменил tool_type на item_type для более общего названия
         super().__init__()
         self.name = name
-        self.image = image
+        self.image = image # Добавлено сохранение изображения
         self.rect = self.image.get_rect()
-        self.tool_type = tool_type  # hoe, axe, wateringcan
+        self.type = item_type  # Сохраняем тип предмета (или инструмента)
 
     def use(self, target):
         pass  # Реализуем в подклассах
 
-
 class Tool(Item):
     def __init__(self, name, image, tool_type, durability=100):
+        # Вызываем конструктор базового класса Item, передавая tool_type как item_type
         super().__init__(name, image, tool_type)
         self.durability = durability
         self.max_durability = durability
-
 
 
 ==================== map_renderer.py ====================
@@ -684,15 +1476,19 @@ class MapRenderer:
 import pygame
 import pytmx
 import os
-
+from src.item import Tool, Item # Убедитесь, что импорт Tool и Item корректен
+from src.game_state import GameState # Импортируем GameState, если он используется в Player
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_manager, x, y, speed=100):
         super().__init__()
-        self.game = game_manager
+        self.coins = 1000
+        self.hotbar_slots = [None] * 5
+        self.inventory = [[] for _ in range(3)]
+        self.game = game_manager # Ссылка на GameManager
 
         # Пути к спрайтам
-        self.sprite_path = "sprites/player/sprites"
+        self.sprite_path = "sprites/player/sprites" # Путь к основным спрайтам движения
 
         # Загрузка и организация спрайтов
         self.animations = self.load_animations()
@@ -706,18 +1502,74 @@ class Player(pygame.sprite.Sprite):
         self.direction = "down"  # Начальное направление
         self.moving = False
         self.current_frame = 0
-        self.animation_speed = 8  # Кадров в секунду
+        # Уменьшаем скорость анимации движения (например, до 6 FPS). Настройте по вкусу.
+        self.animation_speed = 6
         self.animation_timer = 0
 
+        # Переменные для анимации использования инструмента (взмаха)
+        self.is_using_tool = False
+        self.tool_use_animation_timer = 0
+        # Уменьшаем скорость анимации взмаха (например, до 8 FPS). Настройте по вкусу.
+        self.tool_use_animation_speed = 8
+        self.tool_use_current_frame = 0
+        self.current_tool_animation_type = None # Тип текущей анимации инструмента (например, 'hoe_swing')
+
         # Установка начального изображения и прямоугольника
-        self.image = self.animations[self.direction][0]
+        if self.direction in self.animations and self.animations[self.direction]:
+             self.image = self.animations[self.direction][0]
+        else:
+             print(f"Предупреждение: Начальная анимация для направления '{self.direction}' пуста или не существует. Используется заглушка.")
+             dummy = pygame.Surface((16, 16))
+             dummy.fill((0, 255, 0))
+             self.image = dummy
+
         self.rect = self.image.get_rect(topleft=(x, y))
 
         # Создаем отдельный прямоугольник для коллизий
-        self.collision_rect = pygame.Rect(0, 0, 16, 16)  # Размер коллизии (16x16)
+        self.collision_rect = pygame.Rect(0, 0, 10, 10) # Размер коллизии (настройте по необходимости)
         self.update_collision_rect()  # Обновляем позицию коллизии
 
         print(f"Игрок создан на позиции ({x}, {y}) со скоростью {speed}")
+
+
+    def add_coins(self, amount):
+        self.coins += amount
+    
+
+    def remove_coins(self, amount):
+        if self.coins >= amount:
+            self.coins -= amount
+        else:
+            print("Недостаточно монет!")
+
+
+    def draw_coins(self, screen):
+        font = self.game.fonts['small']
+        text = font.render(f"Coins: {self.coins}", True, (255, 255, 255))
+        screen.blit(text, (5, 35,5,5))
+
+    def add_item_to_inventory(self, item, slot_index=None):
+        """Добавляет предмет в инвентарь или хотбар"""
+        if slot_index is not None and 0 <= slot_index < len(self.hotbar_slots):
+            # Добавляем в хотбар
+            self.hotbar_slots[slot_index] = item
+            return True
+        elif self._find_empty_slot():
+            # Добавляем в основной инвентарь
+            row, col = self._find_empty_slot()
+            self.inventory[row][col] = item
+            return True
+        else:
+            print("Инвентарь полон!")
+            return False
+
+    def _find_empty_slot(self):
+        """Ищет первый пустой слот в инвентаре"""
+        for row in range(len(self.inventory)):
+            for col in range(len(self.inventory[row])):
+                if self.inventory[row][col] is None:
+                    return row, col
+        return None
 
     def load_animations(self):
         """Загрузка всех анимаций игрока"""
@@ -726,209 +1578,382 @@ class Player(pygame.sprite.Sprite):
             "left": [],
             "right": [],
             "up": [],
+            "hoe_swing": [], # Анимация для взмаха мотыгой
+            # Добавьте другие анимации инструментов здесь
         }
 
-        # Проверяем наличие папки со спрайтами
+        # --- Загрузка основных анимаций движения ---
+        self.sprite_path = "sprites/player/sprites"
         if not os.path.exists(self.sprite_path):
-            print(f"Ошибка: Путь {self.sprite_path} не существует.")
-            # Создаем заглушку - зеленый квадрат
+            print(f"Ошибка: Путь {self.sprite_path} для основных анимаций не существует.")
             dummy = pygame.Surface((16, 16))
             dummy.fill((0, 255, 0))
-            for direction in animations:
+            for direction in ["down", "left", "right", "up"]:
                 animations[direction] = [dummy]
-            return animations
+        else:
+            try:
+                # Здесь должна быть ваша логика загрузки спрайтов движения
+                # Пример для спрайт-листа 4x4 (16 спрайтов)
+                directions_map = {
+                    "down": [0, 1, 2, 3],
+                    "left": [8, 9, 10, 11],
+                    "right": [12, 13, 14, 15],
+                    "up": [4, 5, 6, 7],
+                }
+                sprites = []
+                for i in range(16): # Измените диапазон, если у вас другое количество спрайтов
+                    img_path = os.path.join(self.sprite_path, f"sprite_{i}.png")
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # sprite = pygame.transform.scale(sprite, (70, 92)) # Пример масштабирования
+                        sprites.append(sprite)
+                    else:
+                        print(f"Предупреждение: Файл {img_path} не найден для основной анимации.")
+                        dummy = pygame.Surface((16, 16))
+                        dummy.fill((255, 0, 255))
+                        sprites.append(dummy)
 
-        try:
-            # Сопоставляем индексы с направлениями
-            directions_map = {
-                "down": [0, 1, 2, 3],  # первая строка (индексы 0-3)
-                "left": [8, 9, 10, 11],  # вторая строка (индексы 4-7)
-                "right": [12, 13, 14, 15],  # третья строка (индексы 8-11)
-                "up": [4, 5, 6, 7],  # четвертая строка (индексы 12-15)
-            }
+                for direction, indices in directions_map.items():
+                    for idx in indices:
+                        if idx < len(sprites):
+                            animations[direction].append(sprites[idx])
+                        else:
+                             print(f"Предупреждение: Индекс спрайта {idx} вне диапазона для направления {direction}.")
+            except Exception as e:
+                print(f"Ошибка при загрузке основных спрайтов: {e}")
+                dummy = pygame.Surface((32, 32))
+                dummy.fill((0, 255, 0))
+                for direction in ["down", "left", "right", "up"]:
+                    animations[direction] = [dummy]
 
-            # Загружаем все спрайты
-            sprites = []
-            for i in range(16):  # 16 спрайтов (4x4)
-                img_path = os.path.join(self.sprite_path, f"sprite_{i}.png")
-                if os.path.exists(img_path):
-                    sprite = pygame.image.load(img_path).convert_alpha()
-                    # Масштабируем спрайт, если нужно
-                    sprite = pygame.transform.scale(sprite, (70, 92))
-                    sprites.append(sprite)
+        # --- Загрузка анимации взмаха мотыгой ---
+        hoe_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "hoe_swing")
+        hoe_swing_files = ["frame_0.png", "frame_1.png"] # Убедитесь, что имена файлов соответствуют
+
+        if os.path.exists(hoe_swing_sprites_dir):
+            try:
+                loaded_frames = 0
+                for filename in hoe_swing_files:
+                    img_path = os.path.join(hoe_swing_sprites_dir, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # Масштабируйте, если нужно, до размера игрока
+                        # sprite = pygame.transform.scale(sprite, (70, 92))
+                        animations["hoe_swing"].append(sprite)
+                        loaded_frames += 1
+                    else:
+                        print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха мотыгой. Проверьте имя файла.")
+
+                if loaded_frames == 0:
+                    print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха мотыгой из {hoe_swing_sprites_dir}. Проверьте имена файлов ({', '.join(hoe_swing_files)}).")
+                    if animations["down"]:
+                         animations["hoe_swing"] = [animations["down"][0]]
+                    else:
+                         dummy = pygame.Surface((32, 32))
+                         dummy.fill((255, 0, 255))
+                         animations["hoe_swing"] = [dummy]
+            except Exception as e:
+                print(f"Ошибка при загрузке анимации взмаха мотыгой из {hoe_swing_sprites_dir}: {e}")
+                if animations["down"]:
+                     animations["hoe_swing"] = [animations["down"][0]]
                 else:
-                    print(f"Предупреждение: Файл {img_path} не найден.")
-                    dummy = pygame.Surface((16, 16))
-                    dummy.fill((255, 0, 255))  # Фиолетовый для обозначения отсутствия
-                    sprites.append(dummy)
+                     dummy = pygame.Surface((32, 32))
+                     dummy.fill((255, 0, 255))
+                     animations["hoe_swing"] = [dummy]
+        else:
+            print(f"Предупреждение: Папка анимации взмаха мотыгой не найдена: {hoe_swing_sprites_dir}")
+            if animations["down"]:
+                 animations["hoe_swing"] = [animations["down"][0]]
+            else:
+                 dummy = pygame.Surface((32, 32))
+                 dummy.fill((255, 0, 255))
+                 animations["hoe_swing"] = [dummy]
 
-            # Распределяем спрайты по анимациям
-            for direction, indices in directions_map.items():
-                for idx in indices:
-                    if idx < len(sprites):
-                        animations[direction].append(sprites[idx])
-
-        except Exception as e:
-            print(f"Ошибка при загрузке спрайтов: {e}")
-            # Создаем заглушку в случае ошибки
-            dummy = pygame.Surface((32, 32))
-            dummy.fill((0, 255, 0))
-            for direction in animations:
-                animations[direction] = [dummy]
-
+        print(f"Загружено {len(animations['hoe_swing'])} кадров для анимации взмаха мотыгой.")
         return animations
 
+    # --- Добавлен метод handle_input для обработки событий, специфичных для игрока ---
+    def handle_input(self, event):
+        """Обработка событий ввода, специфичных для игрока (использование предметов)."""
+        # Обрабатываем ввод игрока только если игра в состоянии Game, не на паузе
+        # и инвентарь НЕ открыт (так как клики мышью идут на инвентарь)
+        if self.game.state == GameState.GAME and not self.game.paused and not self.game.inventory_manager.inventory_open:
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Левая кнопка мыши
+                    # Получаем выбранный предмет из хотбара через InventoryManager
+                    # Убедитесь, что selected_item_index в InventoryManager обновляется корректно
+                    selected_item_index = self.game.inventory_manager.selected_item_index
+                    # Проверяем, что индекс корректен
+                    if 0 <= selected_item_index < len(self.game.inventory_manager.hotbar_slots):
+                        selected_item = self.game.inventory_manager.hotbar_slots[selected_item_index]
+
+                        # Проверяем, есть ли предмет и является ли он инструментом (например, мотыгой)
+                        if selected_item and isinstance(selected_item, Tool): # Используем isinstance(selected_item, Tool)
+                             if selected_item.type == 'hoe' and not self.is_using_tool:
+                                 self.use_tool() # Вызываем метод использования инструмента
+                             # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                             # elif selected_item.type == 'axe' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию топора
+                             # elif selected_item.type == 'wateringcan' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию лейки
+                             # ...
+                        # else:
+                            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
+                    # else:
+                        # print(f"Неверный индекс выбранного слота хотбара: {selected_item_index}") # Отладочный принт
+
+
+            # Обработка движения (клавиши get_pressed() обрабатываются в update)
+            # Логика движения по клавишам WASD/стрелки обрабатывается в методе update()
+            pass # Оставляем этот метод handle_input сфокусированным на использовании предметов
+    # --- Конец добавления метода handle_input ---
+
     def update(self, dt):
-        """Обновление игрока"""
-        keys = pygame.key.get_pressed()
+        """Обновление игрока (движение и анимация)"""
 
-        # Сохраняем предыдущее положение для проверки коллизий
-        prev_x = self.x
-        prev_y = self.y
+        # --- Обработка движения (только если игрок не использует инструмент и инвентарь закрыт) ---
+        # Логика движения обрабатывается здесь с помощью pygame.key.get_pressed()
+        if not self.is_using_tool and not self.game.inventory_manager.inventory_open:
 
-        # Сбрасываем флаг движения
-        was_moving = self.moving
-        self.moving = False
+            keys = pygame.key.get_pressed()
+            prev_x = self.x
+            prev_y = self.y
+            was_moving = self.moving # Сохраняем предыдущее состояние движения
 
-        # Рассчитываем новое положение
-        dx = 0
-        dy = 0
+            dx = 0
+            dy = 0
 
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            dx = -self.speed * dt
-            self.direction = "left"
-            self.moving = True
-        elif keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            dx = self.speed * dt
-            self.direction = "right"
-            self.moving = True
+            if keys[self.game.settings['controls']['left']]: # Используем настройки клавиш из GameManager
+                dx = -self.speed * dt
+            elif keys[self.game.settings['controls']['right']]:
+                dx = self.speed * dt
 
-        if keys[pygame.K_UP] or keys[pygame.K_w]:
-            dy = -self.speed * dt
-            self.direction = "up"
-            self.moving = True
-        elif keys[pygame.K_DOWN] or keys[pygame.K_s]:
-            dy = self.speed * dt
-            self.direction = "down"
-            self.moving = True
+            if keys[self.game.settings['controls']['up']]:
+                dy = -self.speed * dt
+            elif keys[self.game.settings['controls']['down']]:
+                dy = self.speed * dt
 
-        # Обновляем позиции отдельно, чтобы проверить коллизии
-        # Обновляем X
-        self.x += dx
-        self.rect.x = int(self.x)
-        self.update_collision_rect()  # Обновляем позицию прямоугольника коллизии
-        if self.check_collision():
-            self.x = prev_x
-            self.rect.x = int(prev_x)
+            self.moving = (dx != 0 or dy != 0)
 
-        # Обновляем Y
-        self.y += dy
-        self.rect.y = int(self.y)
-        self.update_collision_rect()  # Обновляем позицию прямоугольника коллизии
-        if self.check_collision():
-            self.y = prev_y
-            self.rect.y = int(prev_y)
+            # Определяем направление
+            if self.moving:
+                if keys[self.game.settings['controls']['up']]:
+                    self.direction = "up"
+                elif keys[self.game.settings['controls']['down']]:
+                    self.direction = "down"
+                elif keys[self.game.settings['controls']['left']]:
+                    self.direction = "left"
+                elif keys[self.game.settings['controls']['right']]:
+                    self.direction = "right"
 
-        # Ограничение движения игрока границами карты
-        if hasattr(self.game, "tmx_data") and self.game.map_loaded:
-            map_width = self.game.tmx_data.width * self.game.tmx_data.tilewidth
-            map_height = self.game.tmx_data.height * self.game.tmx_data.tileheight
-            self.x = max(0, min(self.x, map_width - self.rect.width))
-            self.y = max(0, min(self.y, map_height - self.rect.height))
+
+            # Обновляем позиции и проверяем коллизии
+            self.x += dx
             self.rect.x = int(self.x)
-            self.rect.y = int(self.y)
+            self.update_collision_rect()
+            if self.game and hasattr(self.game, 'check_collision'):
+                 if self.game.check_collision(self.collision_rect):
+                     self.x = prev_x
+                     self.rect.x = int(prev_x)
+                     self.update_collision_rect()
 
-        # Обновление анимации
-        self.update_animation(dt, was_moving)
+            self.y += dy
+            self.rect.y = int(self.y)
+            self.update_collision_rect()
+            if self.game and hasattr(self.game, 'check_collision'):
+                 if self.game.check_collision(self.collision_rect):
+                     self.y = prev_y
+                     self.rect.y = int(prev_y)
+                     self.update_collision_rect()
+
+            # Ограничение движения игрока границами карты
+            if hasattr(self.game, "tmx_data") and self.game.map_loaded:
+                map_width = self.game.tmx_data.width * self.game.tmx_data.tilewidth
+                map_height = self.game.tmx_data.height * self.game.tmx_data.tileheight
+                self.x = max(0.0, min(self.x, float(map_width - self.rect.width)))
+                self.y = max(0.0, min(self.y, float(map_height - self.rect.height)))
+                self.rect.x = int(self.x)
+                self.rect.y = int(self.y)
+                self.update_collision_rect()
+
+            # Обновление анимации движения
+            self.update_animation(dt, was_moving)
+
+        elif self.is_using_tool: # Если игрок использует инструмент, обновляем только анимацию инструмента
+             self.update_tool_use_animation(dt)
+        # else: # Если инвентарь открыт или игра на паузе, анимация движения не обновляется
+            # was_moving = self.moving # Сохраняем предыдущее состояние движения
+            # self.moving = False # Игрок не движется, если инвентарь открыт или пауза
+            # self.update_animation(dt, was_moving) # Обновляем анимацию, чтобы перейти в idle
 
     def update_collision_rect(self):
         """Обновляет позицию прямоугольника коллизии."""
-        self.collision_rect.center = self.rect.center
+        self.collision_rect.center = (self.rect.center[0], self.rect.center[1]+7)
 
     def update_animation(self, dt, was_moving):
-        """Обновление анимации игрока"""
-        # Если начали или прекратили движение, сбрасываем кадр и таймер
+        """Обновление анимации игрока (движения)"""
+        if self.is_using_tool: # Если используется инструмент, не обновляем анимацию движения
+            return
+
+        if self.direction not in self.animations or not self.animations[self.direction]:
+            print(f"Предупреждение: Анимация для направления '{self.direction}' пуста или не существует. Используется Fallback.")
+            if "down" in self.animations and self.animations["down"]:
+                 self.image = self.animations["down"][0]
+            else:
+                 dummy = pygame.Surface((32, 32))
+                 dummy.fill((0, 255, 0))
+                 self.image = dummy
+            return
+
         if was_moving != self.moving:
             self.current_frame = 0
             self.animation_timer = 0
 
         if self.moving:
-            # Обновляем таймер анимации
             self.animation_timer += dt
-            # Если прошло достаточно времени, переходим к следующему кадру
             if self.animation_timer >= 1.0 / self.animation_speed:
                 self.animation_timer = 0
-                # Переключаемся на следующий кадр
                 self.current_frame = (self.current_frame + 1) % len(self.animations[self.direction])
         else:
-            # Если не движемся, используем первый кадр
-            self.current_frame = 0
+            self.current_frame = 0 # Используем первый кадр (idle) при остановке
 
-        # Обновляем текущее изображение
         self.image = self.animations[self.direction][self.current_frame]
 
-    def check_collision(self):
-        """Проверка коллизий игрока с объектами на карте."""
-        if not hasattr(self.game, "tmx_data") or not self.game.map_loaded:
-            return False
+    def update_tool_use_animation(self, dt):
+        """Обновление анимации использования инструмента и вызов действия в нужный момент."""
+        # Проверяем, что текущая анимация инструмента существует и не пуста
+        if self.current_tool_animation_type and \
+           self.current_tool_animation_type in self.animations and \
+           self.animations[self.current_tool_animation_type]:
 
-        for layer in self.game.tmx_data.layers:
-            if layer.name == "Коллизия лес" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
-            if layer.name == "Колилзия горок" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
-            if layer.name == "Коллизия река и Озеро" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
-            if layer.name == "Дом" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
-            if layer.name == "Коллизия Мосты" and isinstance(layer, pytmx.TiledTileLayer):
-                for x, y, gid in layer:
-                    if gid != 0:
-                        tile_rect = pygame.Rect(
-                            x * self.game.tmx_data.tilewidth,
-                            y * self.game.tmx_data.tileheight,
-                            self.game.tmx_data.tilewidth,
-                            self.game.tmx_data.tileheight,
-                        )
-                        if self.collision_rect.colliderect(tile_rect):
-                            return True
-        return False
+            self.tool_use_animation_timer += dt
+
+            # Проигрываем анимацию взмаха
+            if self.tool_use_animation_timer >= 1.0 / self.tool_use_animation_speed:
+                self.tool_use_animation_timer = 0
+                prev_frame = self.tool_use_current_frame # Сохраняем предыдущий кадр
+                self.tool_use_current_frame += 1
+
+                # Проверяем, закончилась ли анимация
+                if self.tool_use_current_frame >= len(self.animations[self.current_tool_animation_type]):
+                    self.is_using_tool = False # Сбрасываем флаг использования инструмента
+                    self.tool_use_current_frame = 0 # Сбрасываем кадр анимации инструмента
+                    self.current_tool_animation_type = None # Сбрасываем тип анимации инструмента
+
+                    # После завершения анимации инструмента, возвращаемся к idle-анимации по текущему направлению
+                    if self.direction in self.animations and self.animations[self.direction]:
+                         self.image = self.animations[self.direction][0]
+                    else:
+                         dummy = pygame.Surface((32, 32))
+                         dummy.fill((0, 255, 0))
+                         self.image = dummy
+
+                else:
+                    # Проигрываем следующий кадр анимации инструмента
+                    self.image = self.animations[self.current_tool_animation_type][self.tool_use_current_frame]
+
+                # --- Вызов действия инструмента в определенный момент анимации ---
+                # Вызываем till_tile только один раз при переходе на нужный кадр
+                if self.current_tool_animation_type == 'hoe_swing':
+                    # Например, вызов till_tile на втором кадре анимации взмаха (индекс 1)
+                    if prev_frame == 0 and self.tool_use_current_frame == 1: # Вызываем при переходе от кадра 0 к 1
+                         target_tile_x, target_tile_y = self.get_tile_in_front()
+                         if self.game and hasattr(self.game, 'till_tile') and (target_tile_x != -1 or target_tile_y != -1):
+                              self.game.till_tile(target_tile_x, target_tile_y)
+                         # else:
+                             # print("Не удалось определить координаты тайла перед игроком или GameManager не имеет till_tile.") # Отладочный принт
+
+                # TODO: Добавить вызовы действий для других инструментов в соответствующие моменты анимации
+                # elif self.current_tool_animation_type == 'axe_swing':
+                #     if prev_frame == X and self.tool_use_current_frame == Y:
+                #         self.game.cut_tree(...) # Вызов функции рубки дерева
+                # elif self.current_tool_animation_type == 'watering_can':
+                #     if prev_frame == X and self.tool_use_current_frame == Y:
+                #         self.game.water_tile(...) # Вызов функции полива
+
+        else:
+            # Если нет текущей анимации инструмента или она пуста, сбрасываем флаг использования инструмента
+            self.is_using_tool = False
+            self.tool_use_current_frame = 0
+            self.current_tool_animation_type = None
+            # Возвращаемся к idle-анимации движения
+            if self.direction in self.animations and self.animations[self.direction]:
+                 self.image = self.animations[self.direction][0]
+            else:
+                 dummy = pygame.Surface((32, 32))
+                 dummy.fill((0, 255, 0))
+                 self.image = dummy
+
+    def use_tool(self):
+        """Запускает анимацию использования текущего выбранного инструмента."""
+        # Получаем выбранный предмет из хотбара через InventoryManager
+        if self.game is None or not hasattr(self.game, 'inventory_manager'):
+             print("Ошибка в use_tool: Нет доступа к InventoryManager в GameManager.")
+             return
+
+        inventory_manager = self.game.inventory_manager
+        selected_item_index = inventory_manager.selected_item_index
+
+        if not (0 <= selected_item_index < len(inventory_manager.hotbar_slots)):
+            # print("Неверный индекс выбранного слота хотбара.") # Отладочный принт
+            return
+
+        selected_item = inventory_manager.hotbar_slots[selected_item_index]
+
+        if selected_item and isinstance(selected_item, Tool):
+            if selected_item.type == 'hoe':
+                self.is_using_tool = True
+                self.tool_use_animation_timer = 0
+                self.tool_use_current_frame = 0
+                self.current_tool_animation_type = 'hoe_swing'
+                # Логика вызова till_tile ПЕРЕНЕСЕНА в update_tool_use_animation!
+            # TODO: Добавить запуск анимаций для других инструментов
+            # elif selected_item.type == 'axe':
+            #     self.is_using_tool = True
+            #     self.tool_use_animation_timer = 0
+            #     self.tool_use_current_frame = 0
+            #     self.current_tool_animation_type = 'axe_swing'
+            # ...
+        # else:
+            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
+
+    def get_tile_in_front(self):
+        """Определяет координаты клетки на карте, которая находится перед игроком."""
+        if not self.game or not hasattr(self.game, 'tmx_data') or not self.game.map_loaded:
+             print("Ошибка в get_tile_in_front: Нет доступа к tmx_data в GameManager или карта не загружена.")
+             return -1, -1
+
+        tile_size = self.game.tmx_data.tilewidth
+
+        player_center_x = self.collision_rect.centerx
+        player_center_y = self.collision_rect.centery
+
+        offset_x, offset_y = 0, 0
+        pixel_offset = tile_size // 2
+
+        if self.direction == "right":
+            offset_x = pixel_offset
+        elif self.direction == "left":
+            offset_x = -pixel_offset
+        elif self.direction == "down":
+            offset_y = pixel_offset
+        elif self.direction == "up":
+            offset_y = -pixel_offset
+
+        target_center_x = player_center_x + offset_x
+        target_center_y = player_center_y + offset_y
+
+        target_tile_x = int(target_center_x // tile_size)
+        target_tile_y = int(target_center_y // tile_size)
+
+        map_width_tiles = self.game.tmx_data.width
+        map_height_tiles = self.game.tmx_data.height
+
+        target_tile_x = max(0, min(target_tile_x, map_width_tiles - 1))
+        target_tile_y = max(0, min(target_tile_y, map_height_tiles - 1))
+
+        return target_tile_x, target_tile_y
 
 
 ==================== render_manager.py ====================
@@ -1300,6 +2325,333 @@ settings = {
     'sound_volume': 0.7,
     'master_volume': 0.7
 }
+
+
+==================== shop.py ====================
+
+# shop.py
+import pygame
+from src.item import Item, Tool
+
+class ShopItem:
+    """Класс для предметов в магазине"""
+    def __init__(self, item, buy_price, sell_price=None):
+        self.item = item
+        self.buy_price = buy_price
+        self.sell_price = sell_price if sell_price else buy_price // 2
+        self.quantity = 999  # Бесконечное количество в магазине
+
+
+class Shop:
+    """Класс магазина"""
+    def __init__(self, game_manager):
+        self.game_manager = game_manager
+        self.is_open = False
+        self.current_tab = "buy"  # "buy" или "sell"
+        self.selected_item_index = 0
+        self.scroll_offset = 0
+        # Позиция магазина - устанавливаем позицию по умолчанию
+        # Позиция будет обновлена после загрузки карты
+        self.shop_x, self.shop_y = 1000, 1000
+        self.shop_range = 35  # Радиус действия магазина
+        self.position_set = False  # Флаг для отслеживания установки позиции
+        # Товары магазина
+        self.shop_items = self.init_shop_items()
+        # UI параметры
+        self.font = game_manager.fonts['medium']
+        self.small_font = game_manager.fonts['small']
+
+    def toggle_shop(self):
+        """Открывает/закрывает магазин"""
+        self.is_open = not self.is_open
+        print("Магазин открыт/закрыт")
+
+    def set_position_from_spawn(self):
+        """Устанавливает позицию магазина относительно точки спавна"""
+        if not self.position_set:
+            try:
+                self.shop_x, self.shop_y = 500, 1010
+                self.position_set = True
+                print(f"Позиция магазина установлена: ({self.shop_x}, {self.shop_y})")
+            except AttributeError:
+                # Карта еще не загружена, используем позицию по умолчанию
+                pass
+
+    def init_shop_items(self):
+        """Инициализация товаров магазина"""
+        items = []
+        # Добавляем инструменты из game_manager
+        if hasattr(self.game_manager, 'tools') and 'hoe' in self.game_manager.tools:
+            items.append(ShopItem(self.game_manager.tools['hoe'], 100, 50))
+        # Можно добавить другие товары
+        # Пример создания простых предметов для магазина
+        try:
+            # Семена
+            seed_image = pygame.Surface((32, 32))
+            seed_image.fill((139, 69, 19))  # Коричневый цвет
+            seed_item = Item("Семена", seed_image, "seed")  # Добавлен item_type
+            items.append(ShopItem(seed_item, 10, 5))
+            # Удобрение
+            fertilizer_image = pygame.Surface((32, 32))
+            fertilizer_image.fill((85, 107, 47))  # Оливковый цвет
+            fertilizer_item = Item("Удобрение", fertilizer_image, "fertilizer")  # Добавлен item_type
+            items.append(ShopItem(fertilizer_item, 25, 12))
+        except Exception as e:
+            print(f"Ошибка создания товаров магазина: {e}")
+        return items
+
+    def is_player_in_range(self):
+        """Проверяет, находится ли игрок в радиусе действия магазина"""
+        # Обновляем позицию магазина если она еще не установлена
+        if not self.position_set:
+            self.set_position_from_spawn()
+        player = self.game_manager.player
+        distance = ((player.rect.centerx - self.shop_x) ** 2 +
+                   (player.rect.centery - self.shop_y) ** 2) ** 0.5
+        return distance <= self.shop_range
+
+    def handle_input(self, keys, events):
+        """Обработка ввода для магазина"""
+        if not self.is_open:
+            # Проверяем, нужно ли показать подсказку об открытии магазина
+            if self.is_player_in_range():
+                # Обработка открытия магазина
+                for event in events:
+                    if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                        self.toggle_shop()
+                        return True 
+            return False
+        # Обработка ввода когда магазин открыт
+        for event in events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self.toggle_shop()
+                    return True
+                elif event.key == pygame.K_TAB:
+                    self.switch_tab()
+                    return True
+                elif event.key == pygame.K_UP:
+                    self.selected_item_index = max(0, self.selected_item_index - 1)
+                    return True
+                elif event.key == pygame.K_DOWN:
+                    max_index = len(self.get_current_items()) - 1
+                    self.selected_item_index = min(max_index, self.selected_item_index + 1)
+                    return True
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    self.execute_transaction()
+                    return True
+        return False
+
+    def get_current_items(self):
+        """Возвращает список предметов для текущей вкладки"""
+        if self.current_tab == "buy":
+            return self.shop_items
+        else:  # sell tab
+            # Возвращаем предметы из инвентаря игрока
+            player_items = []
+            # Проверяем хотбар
+            for item in self.game_manager.player.hotbar_slots:
+                if item and item not in player_items:
+                    player_items.append(item)
+            # Проверяем основной инвентарь
+            for row in self.game_manager.player.inventory:
+                for item in row:
+                    if item and item not in player_items:
+                        player_items.append(item)
+            return player_items
+
+    def switch_tab(self):
+        """Переключение между вкладками покупки и продажи"""
+        self.current_tab = "sell" if self.current_tab == "buy" else "buy"
+        self.selected_item_index = 0
+        self.scroll_offset = 0
+
+    def execute_transaction(self):
+        """Выполнение покупки или продажи"""
+        items = self.get_current_items()
+        if not items or self.selected_item_index >= len(items):
+            return
+        if self.current_tab == "buy":
+            self.buy_item(items[self.selected_item_index])
+        else:
+            self.sell_item(items[self.selected_item_index])
+
+    def buy_item(self, shop_item):
+        """Покупка предмета"""
+        player = self.game_manager.player
+        if player.coins >= shop_item.buy_price:
+            player.remove_coins(shop_item.buy_price)
+            player.add_item_to_inventory(shop_item.item)
+            print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
+        else:
+            print("Недостаточно монет!")
+
+    def sell_item(self, item):
+        """Продажа предмета"""
+        # Находим соответствующий товар в магазине для определения цены
+        shop_item = None
+        for si in self.shop_items:
+            if si.item.name == item.name:
+                shop_item = si
+                break
+        if shop_item:
+            # Удаляем предмет из инвентаря игрока
+            if hasattr(self.game_manager.player, 'remove_item_from_inventory'):
+                success = self.game_manager.player.remove_item_from_inventory(item)
+                if success:
+                    print(f"Продан предмет: {item.name} за {shop_item.sell_price} монет")
+                else:
+                    print("Не удалось продать предмет")
+            else:
+                print("Ошибка: У игрока нет метода удаления предметов из инвентаря")
+        else:
+            print("Этот предмет нельзя продать в магазине")
+
+    def draw(self, screen):
+        """Отрисовка магазина"""
+        # Отрисовка подсказки об открытии магазина
+        if not self.is_open and self.is_player_in_range():
+            self.draw_shop_hint(screen)
+        # Отрисовка окна магазина
+        if self.is_open:
+            self.draw_shop_window(screen)
+
+    def draw_shop_hint(self, screen):
+        """Отрисовка подсказки об открытии магазина"""
+        hint_text = "Нажмите E для открытия магазина"
+        text_surface = self.font.render(hint_text, True, (255, 255, 255))
+        # Позиционируем текст по центру экрана внизу
+        text_rect = text_surface.get_rect()
+        text_rect.centerx = screen.get_width() // 2
+        text_rect.y = screen.get_height() - 150
+        # Фон для текста
+        bg_rect = text_rect.inflate(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=5)
+        screen.blit(text_surface, text_rect)
+
+    def draw_shop_window(self, screen):
+        """Отрисовка окна магазина"""
+        # Размеры окна магазина
+        window_width = 600
+        window_height = 400
+        window_x = (screen.get_width() - window_width) // 2
+        window_y = (screen.get_height() - window_height) // 2
+        # Фон окна
+        pygame.draw.rect(screen, (40, 40, 40), (window_x, window_y, window_width, window_height), border_radius=10)
+        pygame.draw.rect(screen, (255, 255, 255), (window_x, window_y, window_width, window_height), 3, border_radius=10)
+        # Заголовок
+        title = "МАГАЗИН"
+        title_surface = self.font.render(title, True, (255, 255, 255))
+        title_rect = title_surface.get_rect(centerx=window_x + window_width // 2, y=window_y + 10)
+        screen.blit(title_surface, title_rect)
+        # Вкладки
+        self.draw_tabs(screen, window_x, window_y + 50, window_width)
+        # Список предметов
+        self.draw_item_list(screen, window_x, window_y + 100, window_width, window_height - 150)
+        # Инструкции
+        instructions = [
+            "↑/↓ - выбор предмета",
+            "ENTER/SPACE - купить/продать",
+            "TAB - сменить вкладку",
+            "ESC - закрыть"
+        ]
+        y_offset = window_y + window_height - 80
+        for instruction in instructions:
+            text = self.small_font.render(instruction, True, (200, 200, 200))
+            screen.blit(text, (window_x + 10, y_offset))
+            y_offset += 15
+
+    def draw_tabs(self, screen, x, y, width):
+        """Отрисовка вкладок магазина"""
+        tab_width = width // 2
+        # Вкладка покупки
+        buy_color = (60, 60, 60) if self.current_tab == "buy" else (30, 30, 30)
+        pygame.draw.rect(screen, buy_color, (x, y, tab_width, 40), border_radius=5)
+        if self.current_tab == "buy":
+            pygame.draw.rect(screen, (0, 255, 0), (x, y, tab_width, 40), 2, border_radius=5)
+        buy_text = self.font.render("ПОКУПКА", True, (255, 255, 255))
+        buy_rect = buy_text.get_rect(center=(x + tab_width // 2, y + 20))
+        screen.blit(buy_text, buy_rect)
+        # Вкладка продажи
+        sell_color = (60, 60, 60) if self.current_tab == "sell" else (30, 30, 30)
+        pygame.draw.rect(screen, sell_color, (x + tab_width, y, tab_width, 40), border_radius=5)
+        if self.current_tab == "sell":
+            pygame.draw.rect(screen, (0, 255, 0), (x + tab_width, y, tab_width, 40), 2, border_radius=5)
+        sell_text = self.font.render("ПРОДАЖА", True, (255, 255, 255))
+        sell_rect = sell_text.get_rect(center=(x + tab_width + tab_width // 2, y + 20))
+        screen.blit(sell_text, sell_rect)
+
+    def draw_item_list(self, screen, x, y, width, height):
+        """Отрисовка списка предметов"""
+        items = self.get_current_items()
+        if not items:
+            no_items_text = "Нет предметов" if self.current_tab == "sell" else "Магазин пуст"
+            text = self.font.render(no_items_text, True, (200, 200, 200))
+            text_rect = text.get_rect(center=(x + width // 2, y + height // 2))
+            screen.blit(text, text_rect)
+            return
+        item_height = 60
+        visible_items = height // item_height
+        for i in range(min(visible_items, len(items))):
+            item_index = i + self.scroll_offset
+            if item_index >= len(items):
+                break
+            item_y = y + i * item_height
+            # Выделение выбранного предмета
+            if item_index == self.selected_item_index:
+                pygame.draw.rect(screen, (80, 80, 80), (x + 10, item_y, width - 20, item_height - 5), border_radius=5)
+            if self.current_tab == "buy":
+                self.draw_shop_item(screen, self.shop_items[item_index], x + 20, item_y, width - 40)
+            else:
+                self.draw_inventory_item(screen, items[item_index], x + 20, item_y, width - 40)
+
+    def draw_shop_item(self, screen, shop_item, x, y, width):
+        """Отрисовка предмета в магазине"""
+        # Изображение предмета
+        if hasattr(shop_item.item, 'image') and shop_item.item.image:
+            item_image = pygame.transform.scale(shop_item.item.image, (40, 40))
+            screen.blit(item_image, (x, y + 10))
+        else:
+            # Заглушка
+            pygame.draw.rect(screen, (100, 100, 100), (x, y + 10, 40, 40))
+        # Название предмета
+        name_text = self.font.render(shop_item.item.name, True, (255, 255, 255))
+        screen.blit(name_text, (x + 60, y + 10))
+        # Цена
+        price_text = f"Цена: {shop_item.buy_price} монет"
+        price_surface = self.small_font.render(price_text, True, (255, 215, 0))
+        screen.blit(price_surface, (x + 60, y + 35))
+
+    def draw_inventory_item(self, screen, item, x, y, width):
+        """Отрисовка предмета из инвентаря для продажи"""
+        # Изображение предмета
+        if hasattr(item, 'image') and item.image:
+            item_image = pygame.transform.scale(item.image, (40, 40))
+            screen.blit(item_image, (x, y + 10))
+        else:
+            # Заглушка
+            pygame.draw.rect(screen, (100, 100, 100), (x, y + 10, 40, 40))
+        # Название предмета
+        name_text = self.font.render(item.name, True, (255, 255, 255))
+        screen.blit(name_text, (x + 60, y + 10))
+        # Цена продажи
+        shop_item = None
+        for si in self.shop_items:
+            if si.item.name == item.name:
+                shop_item = si
+                break
+        if shop_item:
+            price_text = f"Цена: {shop_item.sell_price} монет"
+            price_surface = self.small_font.render(price_text, True, (0, 255, 0))
+        else:
+            price_text = "Нельзя продать"
+            price_surface = self.small_font.render(price_text, True, (255, 0, 0))
+        screen.blit(price_surface, (x + 60, y + 35))
+
+
+==================== tempCodeRunnerFile.py ====================
+
+open
 
 
 ==================== tilemap.py ====================

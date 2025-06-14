@@ -1,8 +1,9 @@
 import pygame
 import pytmx
 import os
-from src.item import Tool, Item # Убедитесь, что импорт Tool и Item корректен
+from src.item import Tool, Item, Seed # Убедитесь, что импорт Tool и Item корректен
 from src.game_state import GameState # Импортируем GameState, если он используется в Player
+from src.plant import Plant
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, game_manager, x, y, speed=100):
@@ -203,17 +204,14 @@ class Player(pygame.sprite.Sprite):
         # Обрабатываем ввод игрока только если игра в состоянии Game, не на паузе
         # и инвентарь НЕ открыт (так как клики мышью идут на инвентарь)
         if self.game.state == GameState.GAME and not self.game.paused and not self.game.inventory_manager.inventory_open:
-
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Левая кнопка мыши
                     # Получаем выбранный предмет из хотбара через InventoryManager
-                    # Убедитесь, что selected_item_index в InventoryManager обновляется корректно
                     selected_item_index = self.game.inventory_manager.selected_item_index
                     # Проверяем, что индекс корректен
                     if 0 <= selected_item_index < len(self.game.inventory_manager.hotbar_slots):
                         selected_item = self.game.inventory_manager.hotbar_slots[selected_item_index]
-
-                        # Проверяем, есть ли предмет и является ли он инструментом (например, мотыгой)
+                        # --- Проверяем, является ли предмет инструментом (например, мотыгой) ---
                         if selected_item and isinstance(selected_item, Tool): # Используем isinstance(selected_item, Tool)
                              if selected_item.type == 'hoe' and not self.is_using_tool:
                                  self.use_tool() # Вызываем метод использования инструмента
@@ -223,16 +221,50 @@ class Player(pygame.sprite.Sprite):
                              # elif selected_item.type == 'wateringcan' and not self.is_using_tool:
                              #     self.use_tool() # Запускаем анимацию лейки
                              # ...
-                        # else:
-                            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
-                    # else:
-                        # print(f"Неверный индекс выбранного слота хотбара: {selected_item_index}") # Отладочный принт
-
-
+                        # --- Проверяем, является ли предмет семенем ---
+                        elif selected_item and isinstance(selected_item, Seed):
+                            # Получаем координаты тайла перед игроком
+                            target_tile_x, target_tile_y = self.get_tile_in_front()
+                            # Проверяем, можно ли сажать на этом тайле, используя метод GameManager
+                            if self.game and hasattr(self.game, 'is_tile_plantable') and (
+                                    target_tile_x != -1 or target_tile_y != -1):
+                                if self.game.is_tile_plantable(target_tile_x, target_tile_y):
+                                    print(
+                                        f"Попытка посадить семя {selected_item.name} на тайл ({target_tile_x}, {target_tile_y}).")
+                                    # !!! ВОТ ТУТ НУЖНО ДОБАВИТЬ СОЗДАНИЕ ОБЪЕКТА PLANT И ДОБАВЛЕНИЕ В ГРУППЫ !!!
+                                    if hasattr(selected_item, 'plant_type'):  # Убедимся, что у семени есть тип растения
+                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x,
+                                                          target_tile_y)
+                                        # Добавляем растение в группы спрайтов в GameManager
+                                        if hasattr(self.game, 'all_sprites') and hasattr(self.game, 'plants'):
+                                            self.game.all_sprites.add(new_plant)
+                                            self.game.plants.add(new_plant)
+                                            print(
+                                                f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
+                                            # Удаляем одно семя из инвентаря после использования
+                                            success = self.game.inventory_manager.remove_item_from_inventory(
+                                                selected_item, quantity=1)
+                                            if success:
+                                                print(f"Одно {selected_item.name} удалено из инвентаря.")
+                                            else:
+                                                print(
+                                                    f"Ошибка: Не удалось удалить {selected_item.name} из инвентаря после посадки.")
+                                            # !!! Обновляем состояние тайла в GameManager !!!
+                                            # Помечаем тайл как занятый растением, сохраняя ссылку на объект
+                                            self.game.update_tile_state(target_tile_x, target_tile_y,
+                                                                        has_plant=new_plant)
+                                        else:
+                                            print(
+                                                "Ошибка: Группы спрайтов all_sprites или plants не найдены в GameManager.")
+                                    else:
+                                        print(
+                                            f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
+                                else:
+                                    print("На этой земле нельзя сажать.")
+                            else:
+                                print("Неверные координаты тайла или метод is_tile_plantable не найден в GameManager.")
             # Обработка движения (клавиши get_pressed() обрабатываются в update)
-            # Логика движения по клавишам WASD/стрелки обрабатывается в методе update()
-            pass # Оставляем этот метод handle_input сфокусированным на использовании предметов
-    # --- Конец добавления метода handle_input ---
+            pass
 
     def update(self, dt):
         """Обновление игрока (движение и анимация)"""

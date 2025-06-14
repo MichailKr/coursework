@@ -6,7 +6,8 @@ from src.event_handler import EventHandler
 from src.render_manager import RenderManager
 from src.player import Player
 from src.camera import Camera
-from src.item import Tool, Item # Импортируем также базовый класс Item
+from src.plant import Plant
+from src.item import Tool, Item, Seed # Импортируем также базовый класс Item
 import pytmx
 import os
 import math
@@ -100,6 +101,7 @@ class GameManager:
         self.npcs = pygame.sprite.Group()
         self.obstacles = pygame.sprite.Group()
         self.items = pygame.sprite.Group()
+        self.plants = pygame.sprite.Group()
 
         # Загрузка карты
         self.map_loaded = False
@@ -173,6 +175,8 @@ class GameManager:
         self.fps_timer = pygame.time.get_ticks()
         self.shop = Shop(self)
 
+        self.tile_states = {}  # Словарь или двумерный список для хранения состояния тайлов
+
         print("GameManager инициализирован успешно")
 
     # --- Методы для мотыги и инвентаря ---
@@ -238,91 +242,148 @@ class GameManager:
         self.players.add(self.player)
         print(f"Игрок создан на позиции ({start_x}, {start_y})")
 
-        # --- Добавляем мотыгу в инвентарь игрока через InventoryManager ---
         if 'hoe' in self.tools:
             print("Мотыга найдена в self.tools.")
-            # Используем InventoryManager для добавления предмета
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
-                # Добавляем мотыгу в первый слот хотбара (или другое место)
                 success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
                 if success:
                     print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
                 else:
                     print("Ошибка: Не удалось добавить мотыгу в инвентарь через InventoryManager.")
             else:
-                 print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
+                print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
         else:
             print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
-        # --- Конец блока изменения ---
+            # --- Конец блока изменения для мотыги ---
+            # --- Добавляем семена пшеницы и томатов в инвентарь игрока ---
+        try:
+            # Путь к спрайтам предметов (семян)
+            item_sprites_path = os.path.join("sprites", "items")  # Предполагаем, что спрайты предметов тут
+            # Загружаем изображения для семян пшеницы и томатов
+            wheat_seed_image_path = os.path.join(item_sprites_path, "wheat_plant.png")  # Используем wheat_plant.png
+            tomato_seed_image_path = os.path.join(item_sprites_path, "tomato_plant.png")  # Используем tomato_plant.png
+            wheat_seed_image = None
+            tomato_seed_image = None
+            try:
+                wheat_seed_image = pygame.image.load(wheat_seed_image_path).convert_alpha()
+                print(f"Изображение семян пшеницы успешно загружено: {wheat_seed_image_path}")
+            except pygame.error as e:
+                print(f"Ошибка загрузки изображения семян пшеницы: {e}")
+                print(f"Проверьте путь к файлу: {wheat_seed_image_path}")
+                # Используем заглушку, если изображение не найдено
+                wheat_seed_image = pygame.Surface((32, 32))
+                wheat_seed_image.fill((210, 180, 140))  # Цвет пшеницы для заглушки
+            try:
+                tomato_seed_image = pygame.image.load(tomato_seed_image_path).convert_alpha()
+                print(f"Изображение семян томатов успешно загружено: {tomato_seed_image_path}")
+            except pygame.error as e:
+                print(f"Ошибка загрузки изображения семян томатов: {e}")
+                print(f"Проверьте путь к файлу: {tomato_seed_image_path}")
+                # Используем заглушку, если изображение не найдено
+                tomato_seed_image = pygame.Surface((32, 32))
+                tomato_seed_image.fill((255, 99, 71))  # Цвет томата для заглушки
+            # Создаем экземпляры семян, передавая тип растения
+            wheat_seed = Seed("Семена пшеницы", wheat_seed_image, "wheat")  # Тип растения 'wheat'
+            tomato_seed = Seed("Семена томатов", tomato_seed_image, "tomato")  # Тип растения 'tomato'
+            # Добавляем семена в инвентарь (например, в следующие слоты хотбара)
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
+                # Добавляем пшеницу во 2-й слот (индекс 1)
+                self.inventory_manager.add_item_to_inventory(wheat_seed, slot_index=1)
+                # Добавляем томаты в 3-й слот (индекс 2)
+                self.inventory_manager.add_item_to_inventory(tomato_seed, slot_index=2)
+                print("Семена пшеницы и томатов добавлены в инвентарь игрока.")
+            else:
+                print("Ошибка: InventoryManager не инициализирован при попытке добавить семена.")
+        except Exception as e:
+            print(f"Произошла ошибка при создании или добавлении семян в инвентарь: {e}")
+
+    def is_tile_plantable(self, tile_x, tile_y):
+        """Проверяет, можно ли посадить семя на данном тайле."""
+        if not self.tmx_data:
+             print("Ошибка в is_tile_plantable: tmx_data не загружена.")
+             return False
+        map_width_tiles = self.tmx_data.width
+        map_height_tiles = self.tmx_data.height
+        if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
+            # print(f"Координаты тайла ({tile_x}, {tile_y}) вне границ карты.") # Можно убрать для чистоты лога
+            return False # Вне границ карты сажать нельзя
+        # Проверяем состояние тайла в нашей структуре tile_states
+        tile_coords = (tile_x, tile_y)
+        state = self.tile_states.get(tile_coords, {}) # Получаем состояние или пустой словарь
+        # Можно сажать, если земля вспахана ('is_tilled' == True) И на ней нет растения ('has_plant' == False или отсутствует)
+        return state.get('is_tilled', False) and not state.get('has_plant', False)
 
     def till_tile(self, tile_x, tile_y):
         """
-        Изменяет тайл травы на тайл земли по указанным координатам.
+        Изменяет тайл травы на тайл земли по указанным координатам и
+        обновляет состояние тайла для посадки.
         """
         print(f"Попытка вспахать клетку: ({tile_x}, {tile_y})") # Начало метода
-
         if not self.tmx_data or not self.soil_layer or not isinstance(self.soil_layer, pytmx.TiledTileLayer) or \
            not self.grass_layer or not isinstance(self.grass_layer, pytmx.TiledTileLayer) or self.dirt_tile_gid is None:
             print("Ошибка в till_tile: Не все необходимые данные карты загружены или имеют правильный тип. Возврат.")
             return
-
         tile_width = self.tmx_data.tilewidth
         tile_height = self.tmx_data.tileheight
         map_width_tiles = self.tmx_data.width
         map_height_tiles = self.tmx_data.height
-
-        # Проверяем границы карты
         if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
             print(f"Предупреждение в till_tile: Координаты ({tile_x}, {tile_y}) вне границ карты. Возврат.")
             return
-
         # Получаем GID тайла на слое травы по координатам
-        # Используем метод get_tile_gid, который получает GID на конкретной позиции слоя
-        # Доступ к данным слоя через .data (двумерный список GIDов)
-        # Индексирование: [y][x]
         gid = self.grass_layer.data[tile_y][tile_x]
-        print(f"GID тайла на слое '{self.grass_layer.name}' по координатам ({tile_x}, {tile_y}): {gid}") # Отладочный вывод
-
-
+        # print(f"GID тайла на слое '{self.grass_layer.name}' по координатам ({tile_x}, {tile_y}): {gid}") # Отладочный вывод
         if gid != 0: # Проверяем, что на этой клетке есть тайл (не пустая)
-            print(f"Найдена непустая клетка с GID: {gid}") # Отладочный вывод
-
+            # print(f"Найдена непустая клетка с GID: {gid}") # Отладочный вывод
             # Получаем свойства тайла травы на этой позиции
             try:
-                # Вручную находим индекс слоя grass_layer
                 grass_layer_index = -1
                 for i, layer in enumerate(self.tmx_data.layers):
                     if layer is self.grass_layer:
                         grass_layer_index = i
                         break
-
                 if grass_layer_index == -1:
                     print(f"Ошибка в till_tile: Объект слоя травы не найден в списке слоев карты. Возврат.")
                     return
-
-                # Теперь вызываем get_tile_properties с индексом слоя
                 tile_properties = self.tmx_data.get_tile_properties(tile_x, tile_y, grass_layer_index)
-                print(f"Свойства тайла (GID {gid}): {tile_properties}") # Отладочный вывод
-
-
+                # print(f"Свойства тайла (GID {gid}): {tile_properties}") # Отладочный вывод
             except Exception as e:
                  print(f"Ошибка при получении свойств тайла травы в till_tile на ({tile_x}, {tile_y}): {e}")
-                 tile_properties = None # Устанавливаем свойства в None в случае ошибки
-
-
+                 tile_properties = None
             # Проверяем, является ли тайл травой (по свойству)
-            # Убедимся, что tile_properties не None и содержит нужный ключ
             if tile_properties and isinstance(tile_properties, dict) and tile_properties.get('type') == 'grass':
                 print("Тайл является травой. Производим вспашку.") # Отладочный вывод
-
-                self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
-                print(f"Вспахана клетка: ({tile_x}, {tile_y})")
-
+                # Изменяем тайл на слое травы на тайл земли (или просто удаляем тайл травы, если земля находится на другом слое)
+                if self.soil_layer and isinstance(self.soil_layer, pytmx.TiledTileLayer) and self.dirt_tile_gid is not None:
+                    self.grass_layer.data[tile_y][tile_x] = 0 # Удаляем тайл травы
+                    # Опционально: ставим тайл вспаханной земли на слой "Песочек"
+                    # self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                    print(f"Тайл травы на ({tile_x}, {tile_y}) удален.")
+                else:
+                     self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                     print(f"Тайл на ({tile_x}, {tile_y}) изменен на GID земли ({self.dirt_tile_gid}).")
+                # --- Обновляем состояние тайла для посадки ---
+                tile_coords = (tile_x, tile_y)
+                if tile_coords not in self.tile_states:
+                     self.tile_states[tile_coords] = {}
+                self.tile_states[tile_coords]['is_tilled'] = True
+                # Убедимся, что нет растения при вспашке
+                self.tile_states[tile_coords]['has_plant'] = False
+                print(f"Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}")
             else:
-                 print(f"Тайл не является травой или не имеет нужного свойства. Свойства: {tile_properties}. Требуется: {{'type': 'grass'}}") # Отладочный вывод
-
+                 # print(f"Тайл не является травой или не имеет нужного свойства. Свойства: {tile_properties}. Требуется: {{'type': 'grass'}}") # Отладочный вывод
+                 pass # Нет необходимости в отладочном выводе для каждого не-травяного тайла
         else:
-             print("Клетка пустая (GID 0). Вспашка не требуется.") # Отладочный вывод
+             # print("Клетка пустая (GID 0). Вспашка не требуется.") # Отладочный вывод
+             pass # Нет необходимости в отладочном выводе для пустых клеток
+
+    def update_tile_state(self, tile_x, tile_y, **kwargs):
+        """Обновляет состояние тайла по указанным координатам."""
+        tile_coords = (tile_x, tile_y)
+        if tile_coords not in self.tile_states:
+            self.tile_states[tile_coords] = {}
+        self.tile_states[tile_coords].update(kwargs)
+        # print(f"Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}") # Отладочный вывод
 
     # --- Методы обработки событий и отрисовки ---
 
@@ -333,46 +394,52 @@ class GameManager:
         """
         events = pygame.event.get()
         keys = pygame.key.get_pressed()  # Получаем состояние клавиш
-
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
-                return False
-
+                return False # Сигнализируем, что игра должна завершиться
+            # --- Передача события Event Handler ---
+            # Сначала обрабатываем общие события (меню, пауза и т.д.)
             if not self.event_handler.handle_events(event):
-                self.running = False
+                # Event Handler может установить self.running = False
+                # или изменить состояние игры (например, на GameState.QUIT)
+                # Если Event Handler возвращает False, завершаем обработку событий
                 return False
-
             # --- Передача события игроку ---
-            if hasattr(self, 'player') and self.player:
+            # Передаем событие игроку только если игра в состоянии GAME
+            if self.state == GameState.GAME and hasattr(self, 'player') and self.player:
                 self.player.handle_input(event)
-
             # --- Передача события инвентарю ---
-            self.inventory_manager.handle_input(event)
-
+            # Инвентарь должен обрабатывать события всегда, чтобы его можно было открыть/закрыть
+            if hasattr(self, 'inventory_manager') and self.inventory_manager:
+                 self.inventory_manager.handle_input(event)
             # --- Обработка взаимодействия с магазином ---
-            if event.type == pygame.KEYDOWN:
-                if event.key == self.settings['controls']['interact']:
-                    if hasattr(self, 'shop') and isinstance(self.shop, Shop):
-                        # Убедитесь, что инвентарь закрыт при взаимодействии с магазином
-                        if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
-                            self.shop.toggle_shop()
-                            print("Магазин открыт/закрыт")
-                        elif self.inventory_manager.inventory_open and self.shop.is_open:
-                            pass  # Можно добавить логику для инвентаря магазина
-
+            # Обрабатываем событие только если магазин инициализирован
+            if hasattr(self, 'shop') and isinstance(self.shop, Shop):
+                 # Обработка открытия/закрытия магазина по клавише взаимодействия
+                 if event.type == pygame.KEYDOWN and event.key == self.settings['controls']['interact']:
+                     # Проверяем, находится ли игрок в зоне магазина и инвентарь закрыт
+                     if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                         self.shop.toggle_shop()
+                         print("Магазин открыт/закрыт")
+                     # Если магазин открыт, клики вне инвентаря могут быть для магазина
+                     elif self.shop.is_open:
+                          # Дополнительная логика для магазина при клике мыши (если нужна)
+                          if event.type == pygame.MOUSEBUTTONDOWN:
+                               pass # TODO: Добавить логику обработки кликов в магазине
         # Вызов handle_input для магазина (если он открыт)
+        # Обработка ввода с клавиатуры в магазине (например, для выбора предметов)
         if hasattr(self, 'shop') and self.shop.is_open:
-            self.shop.handle_input(keys, events)
-
-        return True
+            self.shop.handle_input(keys, events) # Передаем состояние клавиш и список событий
+        return True # Возвращаем True, если игра должна продолжаться
 
     def update(self):
         """Обновляет состояние игры"""
         delta_time = self.clock.tick(self.settings['fps_limit']) / 1000.0
         if self.state == GameState.GAME and not self.paused:
-            # Сначала обновляем спрайты (включая игрока)
+            # Сначала обновляем спрайты (включая игрока и растения)
             self.all_sprites.update(delta_time)
+            self.plants.update(delta_time) # !!! Обновляем группу растений !!!
             # Обновляем камеру, привязывая её к игроку
             self.camera.update(self.player)
             self.update_clock()
@@ -397,16 +464,20 @@ class GameManager:
             # Отрисовка только видимой части карты
             if self.map_loaded:
                 self.render_map(screen)
-            # Отрисовка всех спрайтов
-            all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.bottom)
+            # Отрисовка всех спрайтов (включая игрока)
+            # Сортируем спрайты по нижней границе для правильной отрисовки (персонажи перед растениями)
+            all_sprites_except_plants = [s for s in self.all_sprites if
+                                         not isinstance(s, Plant)]  # Исключаем растения из основной группы отрисовки
+            all_sprites_sorted = sorted(all_sprites_except_plants, key=lambda sprite: sprite.rect.bottom)
             for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
+            # !!! Отрисовка растений !!!
+            # Растения также являются спрайтами и будут отрисовываться вместе с all_sprites
+            # Если нужно отдельное управление отрисовкой растений, можно отрисовывать self.plants здесь
             self.draw_clock(screen)
             # Отрисовка интерфейса (всегда поверх всего остального)
-            # --- Добавьте вызов отрисовки инвентаря из InventoryManager ---
             self.inventory_manager.draw(screen)
-            # --- Конец блока добавления ---
             self.shop.draw(screen)
             self.player.draw_coins(screen)
             # Отрисовка FPS (для отладки)

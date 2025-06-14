@@ -17,3 +17,15 @@ class Tool(Item):
         super().__init__(name, image, tool_type)
         self.durability = durability
         self.max_durability = durability
+
+class Seed(Item):
+    def __init__(self, name, image, plant_type):
+        # Указываем тип предмета как 'seed' и добавляем тип растения (cucumber, tomato, potato)
+        super().__init__(name, image, 'seed')
+        self.plant_type = plant_type # Тип растения, которое вырастет из семени
+        # Здесь можно добавить другие атрибуты, связанные с ростом, если понадобится
+
+    def plant(self, location):
+        # Метод для посадки семени. Пока просто заглушка.
+        print(f"Посажено семя {self.name} в {location}")
+        pass

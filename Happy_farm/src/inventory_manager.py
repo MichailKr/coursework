@@ -501,3 +501,37 @@ class InventoryManager:
              dummy = pygame.Surface((item_slot_size, item_slot_size))
              dummy.fill((255, 0, 0)) # Красная заглушка
              screen.blit(dummy, (slot_x + (slot_size - item_slot_size) // 2, slot_y + (slot_size - item_slot_size) // 2))
+
+    def remove_item_from_inventory(self, item_to_remove, quantity=1):
+        """
+        Удаляет указанное количество предмета из инвентаря или хотбара.
+        Возвращает True, если удаление успешно, False в противном случае.
+        """
+        removed_count = 0
+        # Сначала пытаемся удалить из хотбара
+        for i in range(len(self.hotbar_slots)):
+            current_item = self.hotbar_slots[i]
+            if current_item and current_item.name == item_to_remove.name:
+                # В упрощенном варианте просто обнуляем слот
+                self.hotbar_slots[i] = None
+                removed_count += 1
+                print(f"Удален 1 {item_to_remove.name} из хотбара.")
+                if removed_count >= quantity:
+                    return True  # Успешно удалили нужное количество
+        # Если нужно удалить больше, чем есть в хотбаре, ищем в основном инвентаре
+        # В текущей простой реализации инвентаря это может быть сложно.
+        # В более продвинутой системе инвентаря нужно будет учитывать стаки предметов.
+        # В текущей структуре, где каждый слот - отдельный предмет,
+        # просто ищем и удаляем нужное количество экземпляров.
+        if removed_count < quantity:
+            print(
+                f"Нужно удалить еще {quantity - removed_count} {item_to_remove.name} из основного инвентаря (пока не реализовано).")
+            # TODO: Реализовать поиск и удаление из основного инвентаря
+            # Простая заглушка: если удалили из хотбара, считаем успешным.
+            # Если не удалили из хотбара, но нужно удалить, это ошибка в этой реализации.
+            if removed_count > 0:
+                return True  # Если что-то удалили из хотбара, считаем успешным для данного запроса
+            else:
+                print(f"Не удалось найти {item_to_remove.name} в инвентаре для удаления.")
+                return False  # Не найдено предмета для удаления
+        return removed_count >= quantity  # Возвращаем True, если удалили нужное количество
