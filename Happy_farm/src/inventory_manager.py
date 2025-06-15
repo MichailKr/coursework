@@ -31,8 +31,9 @@ class InventoryManager:
         Добавляет предмет в инвентарь или хотбар.
         Если slot_index указан, добавляет в хотбар.
         Если row и col указаны, добавляет в основной инвентарь.
-        Если ничего не указано, пытается найти свободный слот.
+        Если ничего не указано, сначала пробует добавить в хотбар, затем в инвентарь.
         """
+        # Если указан конкретный слот хотбара
         if slot_index is not None:
             if 0 <= slot_index < len(self.hotbar_slots):
                 if self.hotbar_slots[slot_index] is None:
@@ -45,6 +46,8 @@ class InventoryManager:
             else:
                 print(f"Неверный индекс хотбар слота: {slot_index}")
                 return False
+        
+        # Если указаны конкретные координаты инвентаря
         elif row is not None and col is not None:
             if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
                 if self.inventory[row][col] is None:
@@ -57,21 +60,23 @@ class InventoryManager:
             else:
                 print(f"Неверные координаты инвентарь слота: ({row}, {col})")
                 return False
+        
+        # Если ничего не указано - сначала пробуем хотбар
         else:
-            # Поиск свободного слота в инвентаре
+            # Сначала ищем свободный слот в хотбаре
+            for i in range(len(self.hotbar_slots)):
+                if self.hotbar_slots[i] is None:
+                    self.hotbar_slots[i] = item
+                    print(f"Предмет {item.name} добавлен в хотбар слот {i}")
+                    return True
+            
+            # Если в хотбаре нет места, ищем в основном инвентаре
             for r in range(self.inventory_rows):
                 for c in range(self.inventory_cols):
                     if self.inventory[r][c] is None:
                         self.inventory[r][c] = item
                         print(f"Предмет {item.name} добавлен в инвентарь слот ({r}, {c})")
                         return True
-            # Поиск свободного слота в хотбаре (после основного инвентаря)
-            for i in range(len(self.hotbar_slots)):
-                if self.hotbar_slots[i] is None:
-                    self.hotbar_slots[i] = item
-                    print(f"Предмет {item.name} добавлен в хотбар слот {i}")
-                    return True
-
 
         print(f"Не удалось добавить предмет {item.name}: нет свободных слотов.")
         return False
@@ -401,6 +406,32 @@ class InventoryManager:
                  # print(f"Предмет {item.name} напрямую помещен в инвентарь слот ({row}, {col}).") # Отладочный принт
             # else:
                 # print(f"Ошибка прямого размещения: Неверные координаты инвентаря слота ({row}, {col})") # Отладочный принт
+
+
+
+    def remove_item_from_inventory(self, item_to_remove, quantity=1):
+        """Удаляет предмет из инвентаря или хотбара"""
+        removed_count = 0
+
+        # Проверяем хотбар
+        for i, item in enumerate(self.hotbar_slots):
+            if item and item.name == item_to_remove.name:
+                self.hotbar_slots[i] = None
+                removed_count += 1
+                if removed_count >= quantity:
+                    return True
+
+        # Проверяем основной инвентарь
+        for row in range(len(self.inventory)):
+            for col in range(len(self.inventory[row])):
+                if self.inventory[row][col] and self.inventory[row][col].name == item_to_remove.name:
+                    self.inventory[row][col] = None
+                    removed_count += 1
+                    if removed_count >= quantity:
+                        return True
+
+        return removed_count >= quantity
+
 
     def draw(self, screen):
         """Отрисовка инвентаря и хотбара"""

@@ -1,6 +1,7 @@
 # shop.py
 import pygame
-from src.item import Item, Tool
+import os
+from src.item import Item, Tool, Seed
 
 class ShopItem:
     """Класс для предметов в магазине"""
@@ -27,8 +28,8 @@ class Shop:
         # Товары магазина
         self.shop_items = self.init_shop_items()
         # UI параметры
-        self.font = game_manager.fonts['medium']
-        self.small_font = game_manager.fonts['small']
+        self.font = pygame.font.SysFont('Arial', 20)
+        self.small_font = pygame.font.SysFont('Arial', 12)
 
     def toggle_shop(self):
         """Открывает/закрывает магазин"""
@@ -49,24 +50,54 @@ class Shop:
     def init_shop_items(self):
         """Инициализация товаров магазина"""
         items = []
-        # Добавляем инструменты из game_manager
+        
+        # Добавляем инструменты из game_manager (только для покупки)
         if hasattr(self.game_manager, 'tools') and 'hoe' in self.game_manager.tools:
-            items.append(ShopItem(self.game_manager.tools['hoe'], 100, 50))
-        # Можно добавить другие товары
-        # Пример создания простых предметов для магазина
+            items.append(ShopItem(self.game_manager.tools['hoe'], 100, 0))  # sell_price=0 - нельзя продать
+        
+        # Пути к спрайтам
+        item_sprites_seed_path = os.path.join("sprites", "items")
+        item_sprites_plants = os.path.join("sprites", "plants", "grownPlants")
+
         try:
-            # Семена
-            seed_image = pygame.Surface((32, 32))
-            seed_image.fill((139, 69, 19))  # Коричневый цвет
-            seed_item = Item("Семена", seed_image, "seed")  # Добавлен item_type
-            items.append(ShopItem(seed_item, 10, 5))
-            # Удобрение
-            fertilizer_image = pygame.Surface((32, 32))
-            fertilizer_image.fill((85, 107, 47))  # Оливковый цвет
-            fertilizer_item = Item("Удобрение", fertilizer_image, "fertilizer")  # Добавлен item_type
-            items.append(ShopItem(fertilizer_item, 25, 12))
+            # Загружаем изображения для семян (только для покупки)
+            wheat_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "wheat_plant.png")).convert_alpha()
+            tomato_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "tomato_plant.png")).convert_alpha()
+            
+            # Создаем экземпляры семян для магазина
+            wheat_seed = Seed("Семена пшеницы", wheat_seed_image, "wheat")
+            tomato_seed = Seed("Семена томатов", tomato_seed_image, "tomato")
+            
+            # Добавляем в магазин семена (только для покупки)
+            items.append(ShopItem(wheat_seed, 20, 0))  # sell_price=0 - нельзя продать
+            items.append(ShopItem(tomato_seed, 30, 0))  # sell_price=0 - нельзя продать
+            
+            # Загружаем изображения растений (только для продажи)
+            wheat_plant_image = pygame.image.load(os.path.join(item_sprites_plants, "wheat.png")).convert_alpha()
+            tomato_plant_image = pygame.image.load(os.path.join(item_sprites_plants, "tomato.png")).convert_alpha()
+            
+            # Создаем экземпляры растений для продажи
+            wheat_plant = Item("Пшеница", wheat_plant_image, "plant")
+            tomato_plant = Item("Томаты", tomato_plant_image, "plant")
+            
+            # Добавляем растения (только для продажи - buy_price=0)
+            items.append(ShopItem(wheat_plant, 0, 100))  # Цена продажи 100
+            items.append(ShopItem(tomato_plant, 0, 150))  # Цена продажи 150
+            
         except Exception as e:
-            print(f"Ошибка создания товаров магазина: {e}")
+            print(f"Ошибка при создании предметов для магазина: {e}")
+            # Создаем заглушки для растений
+            wheat_plant_image = pygame.Surface((32, 32))
+            wheat_plant_image.fill((210, 180, 140))
+            tomato_plant_image = pygame.Surface((32, 32))
+            tomato_plant_image.fill((255, 99, 71))
+            
+            wheat_plant = Item("Пшеница", wheat_plant_image, "plant")
+            tomato_plant = Item("Томаты", tomato_plant_image, "plant")
+            
+            items.append(ShopItem(wheat_plant, 0, 100))
+            items.append(ShopItem(tomato_plant, 0, 150))
+        
         return items
 
     def is_player_in_range(self):
@@ -114,20 +145,11 @@ class Shop:
     def get_current_items(self):
         """Возвращает список предметов для текущей вкладки"""
         if self.current_tab == "buy":
-            return self.shop_items
+            # Возвращаем только предметы для покупки (buy_price > 0)
+            return [item for item in self.shop_items if item.buy_price > 0]
         else:  # sell tab
-            # Возвращаем предметы из инвентаря игрока
-            player_items = []
-            # Проверяем хотбар
-            for item in self.game_manager.player.hotbar_slots:
-                if item and item not in player_items:
-                    player_items.append(item)
-            # Проверяем основной инвентарь
-            for row in self.game_manager.player.inventory:
-                for item in row:
-                    if item and item not in player_items:
-                        player_items.append(item)
-            return player_items
+            # Возвращаем только предметы для продажи (sell_price > 0 и buy_price == 0)
+            return [item.item for item in self.shop_items if item.sell_price > 0 and item.buy_price == 0]
 
     def switch_tab(self):
         """Переключение между вкладками покупки и продажи"""
@@ -150,31 +172,55 @@ class Shop:
         player = self.game_manager.player
         if player.coins >= shop_item.buy_price:
             player.remove_coins(shop_item.buy_price)
-            player.add_item_to_inventory(shop_item.item)
-            print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
+            # Используем InventoryManager для добавления предмета
+            if hasattr(self.game_manager, 'inventory_manager'):
+                # Пытаемся добавить предмет в инвентарь
+                success = self.game_manager.inventory_manager.add_item_to_inventory(shop_item.item)
+                if success:
+                    print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
+                else:
+                    print("Не удалось добавить предмет в инвентарь (нет свободных слотов).")
+                    # Возвращаем деньги, если не удалось добавить предмет
+                    player.add_coins(shop_item.buy_price)
+            else:
+                print("Ошибка: InventoryManager не найден в game_manager.")
         else:
             print("Недостаточно монет!")
 
     def sell_item(self, item):
-        """Продажа предмета"""
+        """Продажа предмета из инвентаря игрока"""
+        if not item:
+            print("Ошибка: Предмет не указан")
+            return
+
         # Находим соответствующий товар в магазине для определения цены
         shop_item = None
         for si in self.shop_items:
             if si.item.name == item.name:
                 shop_item = si
                 break
-        if shop_item:
-            # Удаляем предмет из инвентаря игрока
-            if hasattr(self.game_manager.player, 'remove_item_from_inventory'):
-                success = self.game_manager.player.remove_item_from_inventory(item)
-                if success:
-                    print(f"Продан предмет: {item.name} за {shop_item.sell_price} монет")
-                else:
-                    print("Не удалось продать предмет")
-            else:
-                print("Ошибка: У игрока нет метода удаления предметов из инвентаря")
-        else:
+
+        if not shop_item:
             print("Этот предмет нельзя продать в магазине")
+            return
+
+        # Проверяем, есть ли InventoryManager
+        if not hasattr(self.game_manager, 'inventory_manager'):
+            print("Ошибка: InventoryManager не найден")
+            return
+
+        # Удаляем предмет из инвентаря через InventoryManager
+        inventory_manager = self.game_manager.inventory_manager
+        if hasattr(inventory_manager, 'remove_item_from_inventory'):
+            success = inventory_manager.remove_item_from_inventory(item)
+            if success:
+                # Начисляем деньги игроку
+                self.game_manager.player.add_coins(shop_item.sell_price)
+                print(f"Продан предмет: {item.name} за {shop_item.sell_price} монет")
+            else:
+                print("Не удалось продать предмет (предмет не найден в инвентаре)")
+        else:
+            print("Ошибка: У InventoryManager нет метода remove_item_from_inventory")
 
     def draw(self, screen):
         """Отрисовка магазина"""
@@ -222,7 +268,7 @@ class Shop:
             "↑/↓ - выбор предмета",
             "ENTER/SPACE - купить/продать",
             "TAB - сменить вкладку",
-            "ESC - закрыть"
+            "E - закрыть"
         ]
         y_offset = window_y + window_height - 80
         for instruction in instructions:

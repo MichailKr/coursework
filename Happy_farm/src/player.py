@@ -9,8 +9,6 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, game_manager, x, y, speed=100):
         super().__init__()
         self.coins = 1000
-        self.hotbar_slots = [None] * 5
-        self.inventory = [[] for _ in range(3)]
         self.game = game_manager # Ссылка на GameManager
 
         # Пути к спрайтам
