@@ -1,29 +1,31 @@
 import pygame
 
 class Item(pygame.sprite.Sprite):
-    def __init__(self, name, image, item_type): # Изменил tool_type на item_type для более общего названия
+    def __init__(self, name, image, item_type, stackable=False, max_stack=1):
         super().__init__()
         self.name = name
-        self.image = image # Добавлено сохранение изображения
+        self.image = image
         self.rect = self.image.get_rect()
-        self.type = item_type  # Сохраняем тип предмета (или инструмента)
+        self.type = item_type
+        self.stackable = stackable  # Можно ли стакать предмет
+        self.max_stack = max_stack  # Максимальное количество в стаке
+        self.quantity = 1  # Текущее количество в стаке
 
     def use(self, target):
         pass  # Реализуем в подклассах
 
 class Tool(Item):
     def __init__(self, name, image, tool_type, durability=100):
-        # Вызываем конструктор базового класса Item, передавая tool_type как item_type
-        super().__init__(name, image, tool_type)
+        # Инструменты не стакаются
+        super().__init__(name, image, tool_type, stackable=False, max_stack=1)
         self.durability = durability
         self.max_durability = durability
 
 class Seed(Item):
     def __init__(self, name, image, plant_type):
-        # Указываем тип предмета как 'seed' и добавляем тип растения (cucumber, tomato, potato)
-        super().__init__(name, image, 'seed')
-        self.plant_type = plant_type # Тип растения, которое вырастет из семени
-        # Здесь можно добавить другие атрибуты, связанные с ростом, если понадобится
+        # Семена стакаются (например, до 20 штук)
+        super().__init__(name, image, 'seed', stackable=True, max_stack=20)
+        self.plant_type = plant_type
 
     def plant(self, location):
         # Метод для посадки семени. Пока просто заглушка.

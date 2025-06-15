@@ -27,58 +27,45 @@ class InventoryManager:
         self.inventory_panel_padding = 10 # Добавлена константа для отступа панели инвентаря
 
     def add_item_to_inventory(self, item, slot_index=None, row=None, col=None):
-        """
-        Добавляет предмет в инвентарь или хотбар.
-        Если slot_index указан, добавляет в хотбар.
-        Если row и col указаны, добавляет в основной инвентарь.
-        Если ничего не указано, сначала пробует добавить в хотбар, затем в инвентарь.
-        """
-        # Если указан конкретный слот хотбара
+        # Если предмет стакается, ищем такой же в инвентаре
+        if item.stackable:
+            # Проверяем хотбар
+            for i, slot_item in enumerate(self.hotbar_slots):
+                if slot_item and slot_item.name == item.name and slot_item.quantity < slot_item.max_stack:
+                    # Увеличиваем количество, если нашли такой же предмет
+                    slot_item.quantity += item.quantity
+                    return True
+
+            # Проверяем основной инвентарь
+            for r in range(self.inventory_rows):
+                for c in range(self.inventory_cols):
+                    inv_item = self.inventory[r][c]
+                    if inv_item and inv_item.name == item.name and inv_item.quantity < inv_item.max_stack:
+                        inv_item.quantity += item.quantity
+                        return True
+
+        # Если предмет не стакается или не найден подходящий стак, добавляем как обычно
         if slot_index is not None:
             if 0 <= slot_index < len(self.hotbar_slots):
                 if self.hotbar_slots[slot_index] is None:
                     self.hotbar_slots[slot_index] = item
-                    print(f"Предмет {item.name} добавлен в хотбар слот {slot_index}")
                     return True
-                else:
-                    print(f"Хотбар слот {slot_index} занят.")
-                    return False
-            else:
-                print(f"Неверный индекс хотбар слота: {slot_index}")
-                return False
-        
-        # Если указаны конкретные координаты инвентаря
         elif row is not None and col is not None:
             if 0 <= row < self.inventory_rows and 0 <= col < self.inventory_cols:
                 if self.inventory[row][col] is None:
                     self.inventory[row][col] = item
-                    print(f"Предмет {item.name} добавлен в инвентарь слот ({row}, {col})")
                     return True
-                else:
-                    print(f"Инвентарь слот ({row}, {col}) занят.")
-                    return False
-            else:
-                print(f"Неверные координаты инвентарь слота: ({row}, {col})")
-                return False
-        
-        # Если ничего не указано - сначала пробуем хотбар
         else:
-            # Сначала ищем свободный слот в хотбаре
+            # Поиск первого свободного слота
             for i in range(len(self.hotbar_slots)):
                 if self.hotbar_slots[i] is None:
                     self.hotbar_slots[i] = item
-                    print(f"Предмет {item.name} добавлен в хотбар слот {i}")
                     return True
-            
-            # Если в хотбаре нет места, ищем в основном инвентаре
             for r in range(self.inventory_rows):
                 for c in range(self.inventory_cols):
                     if self.inventory[r][c] is None:
                         self.inventory[r][c] = item
-                        print(f"Предмет {item.name} добавлен в инвентарь слот ({r}, {c})")
                         return True
-
-        print(f"Не удалось добавить предмет {item.name}: нет свободных слотов.")
         return False
 
     def handle_input(self, event):
@@ -410,27 +397,36 @@ class InventoryManager:
 
 
     def remove_item_from_inventory(self, item_to_remove, quantity=1):
-        """Удаляет предмет из инвентаря или хотбара"""
-        removed_count = 0
-
-        # Проверяем хотбар
+        # Сначала проверяем хотбар
         for i, item in enumerate(self.hotbar_slots):
             if item and item.name == item_to_remove.name:
-                self.hotbar_slots[i] = None
-                removed_count += 1
-                if removed_count >= quantity:
+                if item.stackable:
+                    if item.quantity > quantity:
+                        item.quantity -= quantity
+                        return True
+                    elif item.quantity == quantity:
+                        self.hotbar_slots[i] = None
+                        return True
+                else:
+                    self.hotbar_slots[i] = None
                     return True
 
-        # Проверяем основной инвентарь
-        for row in range(len(self.inventory)):
-            for col in range(len(self.inventory[row])):
-                if self.inventory[row][col] and self.inventory[row][col].name == item_to_remove.name:
-                    self.inventory[row][col] = None
-                    removed_count += 1
-                    if removed_count >= quantity:
+        # Затем основной инвентарь
+        for r in range(self.inventory_rows):
+            for c in range(self.inventory_cols):
+                item = self.inventory[r][c]
+                if item and item.name == item_to_remove.name:
+                    if item.stackable:
+                        if item.quantity > quantity:
+                            item.quantity -= quantity
+                            return True
+                        elif item.quantity == quantity:
+                            self.inventory[r][c] = None
+                            return True
+                    else:
+                        self.inventory[r][c] = None
                         return True
-
-        return removed_count >= quantity
+        return False
 
 
     def draw(self, screen):
@@ -515,23 +511,24 @@ class InventoryManager:
     def _draw_item_in_slot(self, screen, item, slot_x, slot_y, slot_size, item_slot_size):
         """Вспомогательный метод для отрисовки предмета внутри слота."""
         if isinstance(item, Item) and hasattr(item, 'image') and item.image:
-             item_image = item.image
-             img_width, img_height = item_image.get_size()
-             scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
-             scaled_width = int(img_width * scale_factor)
-             scaled_height = int(img_height * scale_factor)
+            item_image = item.image
+            img_width, img_height = item_image.get_size()
+            scale_factor = min(item_slot_size / img_width, item_slot_size / img_height)
+            scaled_width = int(img_width * scale_factor)
+            scaled_height = int(img_height * scale_factor)
 
-             scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
+            scaled_image = pygame.transform.scale(item_image, (scaled_width, scaled_height))
 
-             img_x = slot_x + (slot_size - scaled_width) // 2
-             img_y = slot_y + (slot_size - scaled_height) // 2
+            img_x = slot_x + (slot_size - scaled_width) // 2
+            img_y = slot_y + (slot_size - scaled_height) // 2
 
-             screen.blit(scaled_image, (img_x, img_y))
-        else:
-             # Заглушка для отсутствующего изображения/неправильного объекта
-             dummy = pygame.Surface((item_slot_size, item_slot_size))
-             dummy.fill((255, 0, 0)) # Красная заглушка
-             screen.blit(dummy, (slot_x + (slot_size - item_slot_size) // 2, slot_y + (slot_size - item_slot_size) // 2))
+            screen.blit(scaled_image, (img_x, img_y))
+
+            # Отображаем количество, если предмет стакается и количество > 1
+            if item.stackable and item.quantity > 1:
+                quantity_text = self.game_manager.fonts['small'].render(str(item.quantity), True, (255, 255, 255))
+                text_rect = quantity_text.get_rect(bottomright=(slot_x + slot_size - 5, slot_y + slot_size - 5))
+                screen.blit(quantity_text, text_rect)
 
     def remove_item_from_inventory(self, item_to_remove, quantity=1):
         """

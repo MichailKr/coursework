@@ -168,24 +168,21 @@ class Shop:
             self.sell_item(items[self.selected_item_index])
 
     def buy_item(self, shop_item):
-        """Покупка предмета"""
         player = self.game_manager.player
         if player.coins >= shop_item.buy_price:
             player.remove_coins(shop_item.buy_price)
-            # Используем InventoryManager для добавления предмета
             if hasattr(self.game_manager, 'inventory_manager'):
-                # Пытаемся добавить предмет в инвентарь
-                success = self.game_manager.inventory_manager.add_item_to_inventory(shop_item.item)
-                if success:
-                    print(f"Куплен предмет: {shop_item.item.name} за {shop_item.buy_price} монет")
-                else:
-                    print("Не удалось добавить предмет в инвентарь (нет свободных слотов).")
-                    # Возвращаем деньги, если не удалось добавить предмет
+                # Создаем копию предмета с начальным количеством
+                new_item = type(shop_item.item)(shop_item.item.name, shop_item.item.image, shop_item.item.type)
+                # Копируем все атрибуты из исходного предмета
+                for attr, value in shop_item.item.__dict__.items():
+                    if attr not in ['name', 'image', 'type', 'stackable', 'max_stack', 'quantity']:
+                        setattr(new_item, attr, value)
+                new_item.quantity = 5  # Например, покупаем 5 семян за раз
+                
+                success = self.game_manager.inventory_manager.add_item_to_inventory(new_item)
+                if not success:
                     player.add_coins(shop_item.buy_price)
-            else:
-                print("Ошибка: InventoryManager не найден в game_manager.")
-        else:
-            print("Недостаточно монет!")
 
     def sell_item(self, item):
         """Продажа предмета из инвентаря игрока"""

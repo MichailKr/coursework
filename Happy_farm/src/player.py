@@ -221,42 +221,30 @@ class Player(pygame.sprite.Sprite):
                              # ...
                         # --- Проверяем, является ли предмет семенем ---
                         elif selected_item and isinstance(selected_item, Seed):
-                            # Получаем координаты тайла перед игроком
                             target_tile_x, target_tile_y = self.get_tile_in_front()
-                            # Проверяем, можно ли сажать на этом тайле, используя метод GameManager
-                            if self.game and hasattr(self.game, 'is_tile_plantable') and (
-                                    target_tile_x != -1 or target_tile_y != -1):
+                            if self.game and hasattr(self.game, 'is_tile_plantable'):
                                 if self.game.is_tile_plantable(target_tile_x, target_tile_y):
-                                    print(
-                                        f"Попытка посадить семя {selected_item.name} на тайл ({target_tile_x}, {target_tile_y}).")
-                                    # !!! ВОТ ТУТ НУЖНО ДОБАВИТЬ СОЗДАНИЕ ОБЪЕКТА PLANT И ДОБАВЛЕНИЕ В ГРУППЫ !!!
-                                    if hasattr(selected_item, 'plant_type'):  # Убедимся, что у семени есть тип растения
-                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x,
-                                                          target_tile_y)
-                                        # Добавляем растение в группы спрайтов в GameManager
+                                    # Проверяем наличие атрибута plant_type
+                                    if hasattr(selected_item, 'plant_type'):
+                                        # Уменьшаем количество семян
+                                        selected_item.quantity -= 1
+                                        if selected_item.quantity <= 0:
+                                            # Удаляем предмет из инвентаря, если закончился
+                                            self.game.inventory_manager.hotbar_slots[self.game.inventory_manager.selected_item_index] = None
+                                        
+                                        # Создаем новое растение
+                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x, target_tile_y)
+                                        
+                                        # Добавляем растение в группы спрайтов
                                         if hasattr(self.game, 'all_sprites') and hasattr(self.game, 'plants'):
                                             self.game.all_sprites.add(new_plant)
                                             self.game.plants.add(new_plant)
-                                            print(
-                                                f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
-                                            # Удаляем одно семя из инвентаря после использования
-                                            success = self.game.inventory_manager.remove_item_from_inventory(
-                                                selected_item, quantity=1)
-                                            if success:
-                                                print(f"Одно {selected_item.name} удалено из инвентаря.")
-                                            else:
-                                                print(
-                                                    f"Ошибка: Не удалось удалить {selected_item.name} из инвентаря после посадки.")
-                                            # !!! Обновляем состояние тайла в GameManager !!!
-                                            # Помечаем тайл как занятый растением, сохраняя ссылку на объект
-                                            self.game.update_tile_state(target_tile_x, target_tile_y,
-                                                                        has_plant=new_plant)
-                                        else:
-                                            print(
-                                                "Ошибка: Группы спрайтов all_sprites или plants не найдены в GameManager.")
+                                            print(f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
+                                        
+                                        # Обновляем состояние тайла
+                                        self.game.update_tile_state(target_tile_x, target_tile_y, has_plant=new_plant)
                                     else:
-                                        print(
-                                            f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
+                                        print(f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
                                 else:
                                     print("На этой земле нельзя сажать.")
                             else:
