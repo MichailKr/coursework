@@ -5,6 +5,11 @@ class RenderManager:
     def __init__(self, screen_manager):
         self.screen_manager = screen_manager
         self.map_renderer = MapRenderer()
+        # Загружаем фон один раз при создании меню
+        self.background_image = pygame.image.load('p.jpg').convert()
+        # Если нужно — масштабируем до размера экрана
+        screen = pygame.display.get_surface()  # ИЛИ заранее известный размер
+        self.background_image = pygame.transform.scale(self.background_image, (screen.get_width(), screen.get_height()))
 
         # Инициализация шрифтов
         self.title_font = pygame.font.Font(None, 64)
@@ -20,7 +25,8 @@ class RenderManager:
             'GREEN': (0, 255, 0),
             'RED': (255, 0, 0),
             'BLUE': (0, 0, 255),
-            'TRANSPARENT_BLACK': (0, 0, 0, 128)
+            'TRANSPARENT_BLACK': (0, 0, 0, 128),
+            'YELLOW': (244,169,0)
         }
 
         # Размеры кнопок и отступы
@@ -32,10 +38,15 @@ class RenderManager:
     def draw_menu(self, game_manager):
         """Отрисовка главного меню"""
         screen = self.screen_manager.get_screen()
-        screen.fill(self.COLORS['BLACK'])
+        # Используем сохраненное изображение
+        if hasattr(self, 'background_image'):
+            screen.blit(self.background_image, (0, 0))
+        else:
+            # В случае, если по каким-то причинам не загрузилось, зальем черным
+            screen.fill(self.COLORS['BLACK'])
 
         # Заголовок
-        title = self.title_font.render("Ушастая усадьба", True, self.COLORS['WHITE'])
+        title = self.title_font.render("Ушастая усадьба", True, self.COLORS['YELLOW'])
         title_rect = title.get_rect(center=(screen.get_width() // 2, 100))
         screen.blit(title, title_rect)
 
@@ -70,7 +81,14 @@ class RenderManager:
     def draw_settings(self, game_manager):
         """Отрисовка меню настроек"""
         screen = self.screen_manager.get_screen()
-        screen.fill(self.COLORS['BLACK'])
+        screen = pygame.display.get_surface()  # ИЛИ заранее известный размер
+        self.background_image = pygame.transform.scale(self.background_image, (screen.get_width(), screen.get_height()))
+        # Используем сохраненное изображение
+        if hasattr(self, 'background_image'):
+            screen.blit(self.background_image, (0, 0))
+        else:
+            # В случае, если по каким-то причинам не загрузилось, зальем черным
+            screen.fill(self.COLORS['BLACK'])
 
         # Заголовок
         title = self.title_font.render("Настройки", True, self.COLORS['WHITE'])
