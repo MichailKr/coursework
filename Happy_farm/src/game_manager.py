@@ -468,11 +468,14 @@ class GameManager:
             # Сортируем спрайты по нижней границе для правильной отрисовки (персонажи перед растениями)
             all_sprites_except_plants = [s for s in self.all_sprites if
                                          not isinstance(s, Plant)]  # Исключаем растения из основной группы отрисовки
-            all_sprites_sorted = sorted(all_sprites_except_plants, key=lambda sprite: sprite.rect.bottom)
+            all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.centery)
             for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
             # !!! Отрисовка растений !!!
+            for plant_sprite in self.plants:
+                pos = self.camera.apply(plant_sprite)
+                screen.blit(plant_sprite.image, pos.topleft)
             # Растения также являются спрайтами и будут отрисовываться вместе с all_sprites
             # Если нужно отдельное управление отрисовкой растений, можно отрисовывать self.plants здесь
             self.draw_clock(screen)
@@ -526,34 +529,6 @@ class GameManager:
 
         if self.is_night:
             screen.blit(self.night_overlay, (0, 0))
-
-
-    def draw_clock(self, screen):
-        if self.clock_bg: # Проверяем, что изображение фона часов загружено
-            screen.blit(self.clock_bg, self.clock_pos)
-
-            if self.clock_arrow: # Проверяем, что изображение стрелки часов загружено
-                angle = math.radians(self.game_time * -0.5) # Угол в радианах (умножаем на -0.5 для вращения по часовой стрелке)
-                # Вращаем стрелку
-                rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
-                # Получаем прямоугольник повернутой стрелки и центрируем его по центру фона часов
-                arrow_rect = rotated_arrow.get_rect(center=(
-                    self.clock_pos[0] + self.clock_size // 2,
-                    self.clock_pos[1] + self.clock_size // 2
-                ))
-                screen.blit(rotated_arrow, arrow_rect)
-            else:
-                 print("Предупреждение: Изображение стрелки часов не загружено.")
-
-        else:
-            print("Предупреждение: Изображение фона часов не загружено.")
-
-
-        # Отрисовка затемнения (ночи)
-        if self.is_night and self.night_overlay: # Проверяем наличие night_overlay
-            screen.blit(self.night_overlay, (0, 0))
-        elif self.is_night and not self.night_overlay:
-            print("Предупреждение: night_overlay не инициализирован, но is_night = True.")
 
     def update_clock(self):
         # для дебага
