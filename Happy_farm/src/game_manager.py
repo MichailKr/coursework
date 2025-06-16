@@ -34,7 +34,7 @@ class GameManager:
         self.clock_pos = None
 
         # игровое время
-        self.game_time = 300 # Начинаем с начала дня для отладки
+        self.game_time = 0 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
 
         # затемнение
@@ -245,7 +245,7 @@ class GameManager:
         if 'hoe' in self.tools:
             print("Мотыга найдена в self.tools.")
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
-                success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
+                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['hoe'], slot_index=0)
                 if success:
                     print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
                 else:
@@ -288,9 +288,9 @@ class GameManager:
             # Добавляем семена в инвентарь (например, в следующие слоты хотбара)
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
                 # Добавляем пшеницу во 2-й слот (индекс 1)
-                self.inventory_manager.add_item_to_inventory(wheat_seed, slot_index=1)
+                self.inventory_manager.add_item_by_slot_or_find(wheat_seed, slot_index=1)
                 # Добавляем томаты в 3-й слот (индекс 2)
-                self.inventory_manager.add_item_to_inventory(tomato_seed, slot_index=2)
+                self.inventory_manager.add_item_by_slot_or_find(tomato_seed, slot_index=2)
                 print("Семена пшеницы и томатов добавлены в инвентарь игрока.")
             else:
                 print("Ошибка: InventoryManager не инициализирован при попытке добавить семена.")
@@ -357,7 +357,7 @@ class GameManager:
                 if self.soil_layer and isinstance(self.soil_layer, pytmx.TiledTileLayer) and self.dirt_tile_gid is not None:
                     self.grass_layer.data[tile_y][tile_x] = 0 # Удаляем тайл травы
                     # Опционально: ставим тайл вспаханной земли на слой "Песочек"
-                    # self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                    self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
                     print(f"Тайл травы на ({tile_x}, {tile_y}) удален.")
                 else:
                      self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
@@ -489,34 +489,21 @@ class GameManager:
     def init_clock(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
+
         offset = 10
+
         self.clock_pos = (screen_width - self.clock_size - offset, offset)
 
-        # Загрузка изображений часов
         try:
-            clock_bg_path = os.path.join("sprites", "clock", "clock_bg.png")
-            clock_arrow_path = os.path.join("sprites", "clock", "clock_arrow.png")
-            self.clock_bg = pygame.image.load(clock_bg_path).convert_alpha()
-            self.clock_arrow = pygame.image.load(clock_arrow_path).convert_alpha()
-            print("Изображения часов успешно загружены.")
-        except pygame.error as e:
-            print(f"Ошибка загрузки изображений часов: {e}")
-            print("Создаются заглушки для часов.")
-            # Создаем заглушки, если изображения не найдены
+            self.clock_bg = pygame.image.load("sprites/clock/clock_bg.png").convert_alpha()
+            self.clock_arrow = pygame.image.load("sprites/clock/clock_arrow.png").convert_alpha()
+        except:
             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
+            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size // 2, self.clock_size // 2),
+                               self.clock_size // 2)
             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
-                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
-        except Exception as e:
-             print(f"Произошла другая ошибка при инициализации часов: {e}")
-             # Создаем заглушки в случае других ошибок
-             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
-             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
-                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
-
+                             (self.clock_size // 2 - 2, 10, 4, self.clock_size // 2))
 
         # если нужен будет рескейл
         # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
@@ -524,6 +511,21 @@ class GameManager:
 
         self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
         self.night_overlay.fill((0, 0, 0, 180))
+
+    def draw_clock(self, screen):
+        screen.blit(self.clock_bg, self.clock_pos)
+
+        angle = math.radians(self.game_time * -0.5)
+
+        rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
+        arrow_rect = rotated_arrow.get_rect(center=(
+            self.clock_pos[0] + self.clock_size // 2,
+            self.clock_pos[1] + self.clock_size // 2
+        ))
+        screen.blit(rotated_arrow, arrow_rect)
+
+        if self.is_night:
+            screen.blit(self.night_overlay, (0, 0))
 
 
     def draw_clock(self, screen):
@@ -553,31 +555,19 @@ class GameManager:
         elif self.is_night and not self.night_overlay:
             print("Предупреждение: night_overlay не инициализирован, но is_night = True.")
 
-
     def update_clock(self):
         # для дебага
         # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
 
         current_time = time.time()
-        # Обновляем игровое время каждую секунду реального времени
         if current_time - self.last_time_update >= 1:
-            self.game_time += 1 # Увеличиваем на 1 секунду
+            self.game_time += 1
             self.last_time_update = current_time
 
-        # Пример: день 12 минут (720 секунд) игрового времени = 12 реальных минут
-        # 12 игровых часов = 720 секунд игрового времени
-        # 1 игровой час = 60 секунд игрового времени
+        if self.game_time >= 720:
+            self.game_time = 0
 
-        max_game_time = 720 # Максимальное игровое время в цикле
-
-        if self.game_time >= max_game_time:
-            self.game_time = 0 # Сбрасываем игровое время в начало нового дня
-
-        # Пример: ночь с 11-го до 5-го часа (по циферблату)
-        # 11-й час начинается с (11 * 60) = 660 секунды
-        # 5-й час заканчивается в (5 * 60) = 300 секунд (на следующий день)
-        # То есть ночь с 660 до 720 (конец дня) и с 0 до 300 (начало дня)
-        self.is_night = (self.game_time >= 660) or (self.game_time < 300) # Исправлено условие для начала дня
+        self.is_night = (self.game_time // 60) % 12 == 11
 
     def render_map(self, screen):
         """Отрисовка карты"""

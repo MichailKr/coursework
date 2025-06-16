@@ -1,5 +1,5 @@
 import pygame
-from src.item import Item, Tool # Убедитесь, что путь к Item и Tool правильный
+from src.item import Item, Tool, Tomato, Wheat, Seed # Убедитесь, что путь к Item и Tool правильный
 
 class InventoryManager:
     def __init__(self, game_manager):
@@ -26,25 +26,37 @@ class InventoryManager:
         self.inventory_rows = 6
         self.inventory_panel_padding = 10 # Добавлена константа для отступа панели инвентаря
 
-    def add_item_to_inventory(self, item, slot_index=None, row=None, col=None):
+    def add_item_by_slot_or_find(self, item, slot_index=None, row=None, col=None):
         # Если предмет стакается, ищем такой же в инвентаре
         if item.stackable:
             # Проверяем хотбар
             for i, slot_item in enumerate(self.hotbar_slots):
                 if slot_item and slot_item.name == item.name and slot_item.quantity < slot_item.max_stack:
                     # Увеличиваем количество, если нашли такой же предмет
-                    slot_item.quantity += item.quantity
-                    return True
-
+                    # Здесь ОЧЕНЬ ВАЖНО: item.quantity - это сколько мы хотим добавить.
+                    # slot_item.quantity - сколько уже есть.
+                    # Нужно добавить min(item.quantity, space_available)
+                    space_available = slot_item.max_stack - slot_item.quantity
+                    amount_to_add = min(item.quantity, space_available)
+                    slot_item.quantity += amount_to_add
+                    item.quantity -= amount_to_add  # Уменьшаем количество у добавляемого предмета
+                    if item.quantity == 0:  # Если все добавили, выходим
+                        return True
             # Проверяем основной инвентарь
             for r in range(self.inventory_rows):
                 for c in range(self.inventory_cols):
                     inv_item = self.inventory[r][c]
                     if inv_item and inv_item.name == item.name and inv_item.quantity < inv_item.max_stack:
-                        inv_item.quantity += item.quantity
-                        return True
+                        space_available = inv_item.max_stack - inv_item.quantity
+                        amount_to_add = min(item.quantity, space_available)
+                        inv_item.quantity += amount_to_add
+                        item.quantity -= amount_to_add
+                        if item.quantity == 0:
+                            return True
 
-        # Если предмет не стакается или не найден подходящий стак, добавляем как обычно
+        # Если остались предметы (item.quantity > 0) или предмет не стакается,
+        # ищем пустой слот.
+        # Если указан конкретный слот
         if slot_index is not None:
             if 0 <= slot_index < len(self.hotbar_slots):
                 if self.hotbar_slots[slot_index] is None:
@@ -56,7 +68,12 @@ class InventoryManager:
                     self.inventory[row][col] = item
                     return True
         else:
-            # Поиск первого свободного слота
+            # Поиск первого свободного слота (сначала хотбар, потом инвентарь)
+            # Внимание: если item.quantity > 1 и не все поместилось в стаки,
+            # этот код сейчас будет пытаться поместить весь item.
+            # Для корректной обработки, вам нужно будет создать новый экземпляр Item
+            # с оставшимся количеством. Но чтобы не мудрить, пока оставим так.
+            # Для урожая, приходящего из plant.harvest(), quantity = 1, так что это не проблема.
             for i in range(len(self.hotbar_slots)):
                 if self.hotbar_slots[i] is None:
                     self.hotbar_slots[i] = item
@@ -67,6 +84,244 @@ class InventoryManager:
                         self.inventory[r][c] = item
                         return True
         return False
+
+    def add_item(self, item_instance: Item, quantity: int = 1):
+        """
+        Добавляет уже существующий экземпляр предмета в инвентарь.
+        Используется, когда у нас уже есть объект Item (например, при сборе урожая).
+        item_instance: экземпляр класса Item (или его подкласса), который нужно добавить.
+                       Его image, name, stackable, max_stack уже определены.
+        quantity: количество, которое нужно добавить.
+        """
+        if not isinstance(item_instance, Item):
+            print(f"Ошибка: Попытка добавить не-Item объект в инвентарь: {item_instance}")
+            return False
+        # Подготовка аргументов для создания нового экземпляра/копии
+        # Это нужно, потому что конструкторы Item, Tool, Seed, Tomato, Wheat
+        # принимают разные наборы аргументов.
+        # Общие аргументы, которые есть почти у всех
+        common_args = {
+            'quantity': quantity,
+            'scale_to_size': item_instance.image.get_size() if item_instance.image else None,
+            # 'image_path_or_surface' используется в Item и его прямых подклассах
+            'image_path_or_surface': item_instance.image_path if hasattr(item_instance, 'image_path') else None
+        }
+        # Создаем копию объекта для работы с количеством (item_to_add)
+        # Это важно, чтобы не менять оригинальный item_instance, который пришел извне
+        if isinstance(item_instance, Tomato):
+            # Tomato.__init__ принимает только quantity, description, scale_to_size, image_path_or_surface
+            item_to_add = Tomato(
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size'],
+                image_path_or_surface=common_args['image_path_or_surface']  # Если Tomato может принимать Surface/path
+            )
+        elif isinstance(item_instance, Wheat):
+            # Wheat.__init__ принимает только quantity, description, scale_to_size, image_path_or_surface
+            item_to_add = Wheat(
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size'],
+                image_path_or_surface=common_args['image_path_or_surface']  # Если Wheat может принимать Surface/path
+            )
+        elif isinstance(item_instance, Seed):
+            # Seed.__init__ принимает name, image_path_or_surface, plant_type, quantity, description, scale_to_size
+            item_to_add = Seed(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                plant_type=item_instance.plant_type,
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        elif isinstance(item_instance, Tool):
+            # Tool.__init__ принимает name, image_path_or_surface, tool_type, durability, quantity, description, scale_to_size
+            item_to_add = Tool(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                tool_type=item_instance.tool_type,
+                durability=item_instance.durability,  # Копируем текущую прочность
+                quantity=quantity,  # Инструменты обычно не стакуются, но оставляем для общности
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        elif isinstance(item_instance, Item):  # Базовый Item
+            # Item.__init__ принимает name, image_path_or_surface, item_type, stackable, max_stack, quantity, description, scale_to_size
+            item_to_add = Item(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                item_type=item_instance.item_type,
+                stackable=item_instance.stackable,
+                max_stack=item_instance.max_stack,
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        else:
+            print(f"Ошибка: Неизвестный тип предмета {type(item_instance)} в add_item.")
+            return False
+        remaining_quantity = item_to_add.quantity
+        # --- Шаг 1: Попытка стакать с существующими предметами ---
+        if item_to_add.stackable:
+            # Проверяем хотбар
+            for i, slot_item in enumerate(self.hotbar_slots):
+                if slot_item and slot_item.name == item_to_add.name and slot_item.quantity < slot_item.max_stack:
+                    space_available = slot_item.max_stack - slot_item.quantity
+                    amount_to_fill = min(remaining_quantity, space_available)
+                    slot_item.quantity += amount_to_fill
+                    remaining_quantity -= amount_to_fill
+                    if remaining_quantity == 0:
+                        print(f"Добавлено {quantity}x {item_to_add.name} в существующий стек хотбара.")
+                        return True
+            # Проверяем основной инвентарь
+            for r in range(self.inventory_rows):
+                for c in range(self.inventory_cols):
+                    inv_item = self.inventory[r][c]
+                    if inv_item and inv_item.name == item_to_add.name and inv_item.quantity < inv_item.max_stack:
+                        space_available = inv_item.max_stack - inv_item.quantity
+                        amount_to_fill = min(remaining_quantity, space_available)
+                        inv_item.quantity += amount_to_fill
+                        remaining_quantity -= amount_to_fill
+                        if remaining_quantity == 0:
+                            print(f"Добавлено {quantity}x {item_to_add.name} в существующий стек инвентаря.")
+                            return True
+        # --- Шаг 2: Создание новых стеков или размещение нестекуемых предметов ---
+        while remaining_quantity > 0:
+            found_empty_slot = False
+            # Аргументы для создания new_slot_item
+            # Количество для нового стека будет amount_for_new_stack
+            new_item_creation_quantity = min(remaining_quantity, item_to_add.max_stack)
+            # Сначала ищем пустой слот в хотбаре
+            for i in range(len(self.hotbar_slots)):
+                if self.hotbar_slots[i] is None:
+                    if isinstance(item_to_add, Tomato):
+                        new_slot_item = Tomato(
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size'],
+                            image_path_or_surface=common_args['image_path_or_surface']
+                        )
+                    elif isinstance(item_to_add, Wheat):
+                        new_slot_item = Wheat(
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size'],
+                            image_path_or_surface=common_args['image_path_or_surface']
+                        )
+                    elif isinstance(item_to_add, Seed):
+                        new_slot_item = Seed(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            plant_type=item_to_add.plant_type,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    elif isinstance(item_to_add, Tool):
+                        new_slot_item = Tool(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            tool_type=item_to_add.tool_type,
+                            durability=item_to_add.durability,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    elif isinstance(item_to_add, Item):
+                        new_slot_item = Item(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            item_type=item_to_add.item_type,
+                            stackable=item_to_add.stackable,
+                            max_stack=item_to_add.max_stack,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    else:  # Не должно быть достигнуто, но для безопасности
+                        print(f"Ошибка: Неизвестный тип предмета {type(item_to_add)} при создании нового слота.")
+                        break  # Выход из цикла while
+                    self.hotbar_slots[i] = new_slot_item
+                    remaining_quantity -= new_item_creation_quantity
+                    found_empty_slot = True
+                    print(f"Создан новый стек {new_slot_item.name} x{new_slot_item.quantity} в хотбаре.")
+                    break
+            if found_empty_slot and remaining_quantity == 0:
+                return True
+            # Если остались предметы, ищем пустой слот в основном инвентаре
+            if remaining_quantity > 0:
+                found_empty_slot_in_inventory = False
+                for r in range(self.inventory_rows):
+                    for c in range(self.inventory_cols):
+                        if self.inventory[r][c] is None:
+                            new_item_creation_quantity = min(remaining_quantity, item_to_add.max_stack)
+
+                            if isinstance(item_to_add, Tomato):
+                                new_slot_item = Tomato(
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size'],
+                                    image_path_or_surface=common_args['image_path_or_surface']
+                                )
+                            elif isinstance(item_to_add, Wheat):
+                                new_slot_item = Wheat(
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size'],
+                                    image_path_or_surface=common_args['image_path_or_surface']
+                                )
+                            elif isinstance(item_to_add, Seed):
+                                new_slot_item = Seed(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    plant_type=item_to_add.plant_type,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            elif isinstance(item_to_add, Tool):
+                                new_slot_item = Tool(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    tool_type=item_to_add.tool_type,
+                                    durability=item_to_add.durability,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            elif isinstance(item_to_add, Item):
+                                new_slot_item = Item(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    item_type=item_to_add.item_type,
+                                    stackable=item_to_add.stackable,
+                                    max_stack=item_to_add.max_stack,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            else:
+                                print(
+                                    f"Ошибка: Неизвестный тип предмета {type(item_to_add)} при создании нового слота.")
+                                break
+                            self.inventory[r][c] = new_slot_item
+                            remaining_quantity -= new_item_creation_quantity
+                            found_empty_slot_in_inventory = True
+                            print(f"Создан новый стек {new_slot_item.name} x{new_slot_item.quantity} в инвентаре.")
+                            break
+                    if found_empty_slot_in_inventory:
+                        break
+                if not found_empty_slot_in_inventory:
+                    print(
+                        f"Инвентарь полон, не удалось добавить все {quantity}x {item_to_add.name}. Осталось: {remaining_quantity}")
+                    return False
+            if not found_empty_slot and not found_empty_slot_in_inventory and remaining_quantity > 0:
+                print(
+                    f"Инвентарь полон, не удалось добавить все {quantity}x {item_to_add.name}. Осталось: {remaining_quantity}")
+                return False
+        print(
+            f"Предмет {item_to_add.name} добавлен в инвентарь (добавлено {quantity - remaining_quantity} из {quantity}).")
+        return True
 
     def handle_input(self, event):
         """Обработка событий ввода, связанных с инвентарем (открытие/закрытие, выбор слота, перетаскивание)"""
@@ -84,7 +339,6 @@ class InventoryManager:
         #      print(f"Mouse motion to {event.pos}")
         # --- Конец отладочных принтов ---
 
-
         if event.type == pygame.KEYDOWN:
             # Обработка открытия/закрытия инвентаря клавишей
             if event.key == self.game_manager.settings['controls']['inventory']:
@@ -92,7 +346,6 @@ class InventoryManager:
                 # print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}") # Отладочный принт
 
             # Обработка выбора слота хотбара клавишами 1-8 (если инвентарь закрыт)
-            # Этот блок у вас уже работает
             if not self.inventory_open:
                 for i in range(8):
                     if event.key == getattr(pygame, f'K_{i + 1}'):
@@ -114,8 +367,10 @@ class InventoryManager:
                             self.drag_offset = (mouse_pos[0] - item_image_rect.x, mouse_pos[1] - item_image_rect.y)
                         else:
                             self.drag_offset = (0, 0)
-                        self._remove_item_from_slot(slot_info)
-                        # print(f"Начато перетаскивание предмета {item.name} из {slot_info}") # Отладочный принт
+                        # !!! КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: УДАЛИЛИ ЭТУ СТРОКУ !!!
+                        # self._remove_item_from_slot(slot_info)
+                        # Теперь предмет удаляется из исходного слота только если place_item_in_slot успешно его переместит.
+
                 # TODO: Добавить здесь обработку кликов вне инвентаря (для использования предмета в мире),
                 # если эта логика не в Player.handle_input
 
@@ -126,29 +381,32 @@ class InventoryManager:
                     target_slot_info = self.get_slot_from_click(mouse_pos)
 
                     if target_slot_info:
-                        # print(f"Предмет {self.dragging_item.name} брошен в {target_slot_info}") # Отладочный принт
+                        # Попытка поместить перетаскиваемый предмет в целевой слот
                         success = self.place_item_in_slot(self.dragging_item, target_slot_info, self.drag_start_slot)
                         if not success:
-                            # print(f"Не удалось поместить предмет {self.dragging_item.name} в {target_slot_info}. Возврат в исходный слот {self.drag_start_slot}.") # Отладочный принт
-                            self.place_item_in_slot(self.dragging_item, self.drag_start_slot) # Вернуть в исходный слот
+                            # Если не удалось поместить (например, целевой слот занят и не стакуется/обменялся),
+                            # или если произошло частичное стакание (и place_item_in_slot вернул False),
+                            # то возвращаем оставшийся предмет в исходный слот.
+                            self._place_item_in_slot_direct(self.dragging_item, self.drag_start_slot)
+                            print(f"Не удалось полностью переместить {self.dragging_item.name}. Остаток возвращен в исходный слот.")
                     else:
                         # Предмет брошен вне инвентаря (логика выброса)
                         print(f"Предмет {self.dragging_item.name} выброшен.")
                         # Здесь можно добавить логику для создания объекта Item на земле
+                        # Например: self.game_manager.spawn_item_on_ground(self.dragging_item, self.game_manager.player.rect.center)
 
                     self.dragging_item = None
                     self.drag_start_slot = None
                     self.drag_offset = (0, 0)
+
                 # TODO: Добавить здесь обработку отпускания кликов вне инвентаря
 
         elif event.type == pygame.MOUSEMOTION:
-             # --- Раскомментированный блок для обработки движения мыши ---
              if self.dragging_item:
                  # Позиция перетаскиваемого предмета обновляется при отрисовке.
                  # Здесь можно добавить логику для проверки наведения на слоты,
                  # если хотите визуально подсвечивать целевой слот.
                  pass
-             # --- Конец раскомментированного блока ---
 
 
     def get_item_from_click(self, mouse_pos):
@@ -287,70 +545,76 @@ class InventoryManager:
 
         return None # Неизвестный тип слота
 
-    def place_item_in_slot(self, item, target_slot_info, source_slot_info=None):
+    def place_item_in_slot(self, item_to_place: Item, target_slot_info, source_slot_info=None):
         """
         Помещает предмет в целевой слот.
+        Обрабатывает обмен и стакание.
         Возвращает True при успехе, False при неудаче.
-        Обрабатывает обмен и стакание (пока простая версия).
         """
-        if not item:
-            # print("Попытка поместить None.") # Отладочный принт
+        if not item_to_place:
             return False
-
         target_type = target_slot_info[0]
-        target_index_or_coords = target_slot_info[1:]
-
-        # Получаем текущий предмет в целевом слоте
+        target_index = target_slot_info[1] if target_type == 'hotbar' else None
+        target_row, target_col = (target_slot_info[1], target_slot_info[2]) if target_type == 'inventory' else (
+        None, None)
         current_item_in_target = None
         if target_type == 'hotbar':
-            target_index = target_index_or_coords[0]
             if 0 <= target_index < len(self.hotbar_slots):
-                 current_item_in_target = self.hotbar_slots[target_index]
-            else:
-                print(f"Неверный целевой хотбар слот: {target_slot_info}")
-                return False
+                current_item_in_target = self.hotbar_slots[target_index]
         elif target_type == 'inventory':
-            target_row, target_col = target_index_or_coords
             if 0 <= target_row < self.inventory_rows and 0 <= target_col < self.inventory_cols:
-                 current_item_in_target = self.inventory[target_row][target_col]
-            else:
-                 print(f"Неверный целевой инвентарь слот: {target_slot_info}")
-                 return False
+                current_item_in_target = self.inventory[target_row][target_col]
         else:
-            print(f"Неизвестный целевой слот: {target_slot_info}")
             return False
+        # --- Логика стакания ---
+        if item_to_place.stackable and current_item_in_target and \
+                current_item_in_target.name == item_to_place.name and \
+                current_item_in_target.quantity < current_item_in_target.max_stack:
 
-        # Логика размещения
+            space_available = current_item_in_target.max_stack - current_item_in_target.quantity
+            amount_to_move = item_to_place.quantity
+
+            if amount_to_move <= space_available:
+                # Весь предмет помещается в существующий стек
+                current_item_in_target.quantity += amount_to_move
+                if source_slot_info:
+                    self._remove_item_from_slot(source_slot_info)  # Очищаем исходный слот
+                return True
+            else:
+                # Часть предмета помещается, остальное остается
+                current_item_in_target.quantity += space_available
+                item_to_place.quantity -= space_available
+                # !!! ОЧЕНЬ ВАЖНО !!! Если предмет был взят из source_slot_info
+                # и его количество уменьшилось (item_to_place.quantity > 0),
+                # то нужно вернуть оставшееся количество в source_slot_info.
+                # Это должно быть сделано внешней логикой в handle_input после вызова place_item_in_slot,
+                # если place_item_in_slot вернуло False (что означает, что не все поместилось).
+                return False  # Возвращаем False, чтобы сообщить, что не все помещено
+        # --- Логика обмена или размещения в пустой слот ---
         if current_item_in_target is None:
             # Целевой слот пуст - просто помещаем предмет
             if target_type == 'hotbar':
-                self.hotbar_slots[target_index] = item
+                self.hotbar_slots[target_index] = item_to_place
             elif target_type == 'inventory':
-                self.inventory[target_row][target_col] = item
-            # print(f"Предмет {item.name} помещен в целевой слот {target_slot_info}.") # Отладочный принт
-            return True
-
-        else:
-            # Целевой слот занят - попытка обмена или стакания
-            # Простая логика обмена: если предмет в целевом слоте не None, меняем местами
-            # print(f"Целевой слот {target_slot_info} занят предметом {current_item_in_target.name}. Попытка обмена.") # Отладочный принт
+                self.inventory[target_row][target_col] = item_to_place
 
             if source_slot_info:
-                # Удаляем предмет из исходного слота перед обменом
-                 self._remove_item_from_slot(source_slot_info)
-                 # Помещаем текущий предмет из целевого слота в исходный
-                 self._place_item_in_slot_direct(current_item_in_target, source_slot_info)
-
-            # Помещаем перетаскиваемый предмет в целевой слот
-            if target_type == 'hotbar':
-                self.hotbar_slots[target_index] = item
-            elif target_type == 'inventory':
-                self.inventory[target_row][target_col] = item
-
-            # print(f"Предметы успешно обменены между {source_slot_info} и {target_slot_info}.") # Отладочный принт
-            return True # Обмен считается успешным
-
-        # TODO: Добавить логику стакания предметов (если предметы стакуемые и одного типа)
+                self._remove_item_from_slot(source_slot_info)  # Очищаем исходный слот
+            return True
+        else:
+            # Целевой слот занят и стакание невозможно - пробуем обменять
+            if source_slot_info:
+                # Обмениваем предметы: сначала текущий предмет из целевого слота помещаем в исходный
+                self._place_item_in_slot_direct(current_item_in_target, source_slot_info)
+                # Затем перетаскиваемый предмет помещаем в целевой слот
+                if target_type == 'hotbar':
+                    self.hotbar_slots[target_index] = item_to_place
+                elif target_type == 'inventory':
+                    self.inventory[target_row][target_col] = item_to_place
+                return True
+            else:
+                # Целевой слот занят, и нет исходного слота (нельзя обменять)
+                return False
 
     def _remove_item_from_slot(self, slot_info):
         """Вспомогательный метод для удаления предмета из слота."""
