@@ -1,18 +1,21 @@
-import pygame
-from src.shop import Shop
-from src.game_state import GameState
+from src.inventory_manager import InventoryManager
+from src.render_manager import RenderManager
 from src.screen_manager import ScreenManager
 from src.event_handler import EventHandler
-from src.render_manager import RenderManager
+from src.save_manager import SaveManager
+from src.item import Tool, Item, Seed # Импортируем также базовый класс Item
+from src.game_state import GameState
 from src.player import Player
 from src.camera import Camera
 from src.plant import Plant
-from src.item import Tool, Item, Seed # Импортируем также базовый класс Item
+from src.shop import Shop
+import shutil
+import pygame
 import pytmx
-import os
+import json
 import math
 import time
-from src.inventory_manager import InventoryManager
+import os
 
 class GameManager:
     def __init__(self):
@@ -22,6 +25,7 @@ class GameManager:
         self.screen_manager = ScreenManager()
         self.event_handler = EventHandler(self)
         self.render_manager = RenderManager(self.screen_manager)
+        self.save_manager = SaveManager()
 
         self.state = GameState.MENU
         self.running = True
@@ -34,30 +38,14 @@ class GameManager:
         self.clock_pos = None
 
         # игровое время
-        self.game_time = 0 # Начинаем с начала дня для отладки
+        self.game_time = 300 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
 
         # затемнение
         self.night_overlay = None
         self.is_night = False
 
-        self.settings = {
-            'sound_volume': 0.7,
-            'music_volume': 0.5,
-            'fullscreen': False,
-            'fps_limit': 60,
-            'vsync': True,
-            'language': 'en',
-            'controls': {
-                'up': pygame.K_w,
-                'down': pygame.K_s,
-                'left': pygame.K_a,
-                'right': pygame.K_d,
-                'interact': pygame.K_e,
-                'inventory': pygame.K_i,
-                'menu': pygame.K_ESCAPE #настройки
-            }
-        }
+        self.settings = self.save_manager.saved_data
 
         self.fonts = {
             'small': pygame.font.Font(None, 24),
@@ -111,10 +99,10 @@ class GameManager:
         self.grass_layer = 'Травка' # Будет содержать объект слоя TiledTileLayer
         self.dirt_tile_gid = None # Будет содержать GID тайла земли
 
+
         # Слои коллизий (имена слоев из Tiled)
         self.collision_layers_names = ["Коллизия лес", "Колилзия горок", "Дом", "Коллизия кусты","Коллизии Мосты", "Коллизия камней", "Коллизии река и Озеро"]
         self.collision_layers = [] # Будет содержать объекты TiledTileLayer для коллизий
-
 
         try:
             # Используем более надежный способ формирования пути к карте
@@ -122,6 +110,11 @@ class GameManager:
             self.tmx_data = pytmx.load_pygame(map_path)
             self.map_loaded = True
             print(f"Карта успешно загружена по пути: {map_path}")
+
+
+            self.init_save_system()
+
+            self.tile_states = {}  # Словарь или двумерный список для хранения состояния тайлов
 
             # Получаем объекты слоев после успешной загрузки карты
             self.soil_layer = self.tmx_data.get_layer_by_name('Песочек')
@@ -146,6 +139,8 @@ class GameManager:
                  print("Внимание: Слой 'Травка' не найден в карте. Вспашка не будет работать корректно.")
             if self.dirt_tile_gid is None:
                  print("Внимание: GID тайла земли не найден по свойству 'type'='dirt'. Вспашка не будет работать корректно.")
+
+            self.load_changes() 
 
         except FileNotFoundError:
              print(f"Ошибка загрузки карты: Файл карты не найден по пути: {map_path}")
@@ -175,7 +170,6 @@ class GameManager:
         self.fps_timer = pygame.time.get_ticks()
         self.shop = Shop(self)
 
-        self.tile_states = {}  # Словарь или двумерный список для хранения состояния тайлов
 
         print("GameManager инициализирован успешно")
 
@@ -245,7 +239,7 @@ class GameManager:
         if 'hoe' in self.tools:
             print("Мотыга найдена в self.tools.")
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
-                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['hoe'], slot_index=0)
+                success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
                 if success:
                     print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
                 else:
@@ -288,9 +282,9 @@ class GameManager:
             # Добавляем семена в инвентарь (например, в следующие слоты хотбара)
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
                 # Добавляем пшеницу во 2-й слот (индекс 1)
-                self.inventory_manager.add_item_by_slot_or_find(wheat_seed, slot_index=1)
+                self.inventory_manager.add_item_to_inventory(wheat_seed, slot_index=1)
                 # Добавляем томаты в 3-й слот (индекс 2)
-                self.inventory_manager.add_item_by_slot_or_find(tomato_seed, slot_index=2)
+                self.inventory_manager.add_item_to_inventory(tomato_seed, slot_index=2)
                 print("Семена пшеницы и томатов добавлены в инвентарь игрока.")
             else:
                 print("Ошибка: InventoryManager не инициализирован при попытке добавить семена.")
@@ -357,7 +351,7 @@ class GameManager:
                 if self.soil_layer and isinstance(self.soil_layer, pytmx.TiledTileLayer) and self.dirt_tile_gid is not None:
                     self.grass_layer.data[tile_y][tile_x] = 0 # Удаляем тайл травы
                     # Опционально: ставим тайл вспаханной земли на слой "Песочек"
-                    self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                    # self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
                     print(f"Тайл травы на ({tile_x}, {tile_y}) удален.")
                 else:
                      self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
@@ -489,21 +483,34 @@ class GameManager:
     def init_clock(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
-
         offset = 10
-
         self.clock_pos = (screen_width - self.clock_size - offset, offset)
 
+        # Загрузка изображений часов
         try:
-            self.clock_bg = pygame.image.load("sprites/clock/clock_bg.png").convert_alpha()
-            self.clock_arrow = pygame.image.load("sprites/clock/clock_arrow.png").convert_alpha()
-        except:
+            clock_bg_path = os.path.join("sprites", "clock", "clock_bg.png")
+            clock_arrow_path = os.path.join("sprites", "clock", "clock_arrow.png")
+            self.clock_bg = pygame.image.load(clock_bg_path).convert_alpha()
+            self.clock_arrow = pygame.image.load(clock_arrow_path).convert_alpha()
+            print("Изображения часов успешно загружены.")
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображений часов: {e}")
+            print("Создаются заглушки для часов.")
+            # Создаем заглушки, если изображения не найдены
             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size // 2, self.clock_size // 2),
-                               self.clock_size // 2)
+            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
-                             (self.clock_size // 2 - 2, 10, 4, self.clock_size // 2))
+                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
+        except Exception as e:
+             print(f"Произошла другая ошибка при инициализации часов: {e}")
+             # Создаем заглушки в случае других ошибок
+             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
+             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
+             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
+                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
+
 
         # если нужен будет рескейл
         # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
@@ -511,22 +518,6 @@ class GameManager:
 
         self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
         self.night_overlay.fill((0, 0, 0, 180))
-
-    def draw_clock(self, screen):
-        screen.blit(self.clock_bg, self.clock_pos)
-
-        angle = math.radians(self.game_time * -0.5)
-
-        rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
-        arrow_rect = rotated_arrow.get_rect(center=(
-            self.clock_pos[0] + self.clock_size // 2,
-            self.clock_pos[1] + self.clock_size // 2
-        ))
-        screen.blit(rotated_arrow, arrow_rect)
-
-        if self.is_night:
-            screen.blit(self.night_overlay, (0, 0))
-
 
     def draw_clock(self, screen):
         if self.clock_bg: # Проверяем, что изображение фона часов загружено
@@ -560,14 +551,27 @@ class GameManager:
         # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
 
         current_time = time.time()
+        # Обновляем игровое время каждую секунду реального времени
         if current_time - self.last_time_update >= 1:
-            self.game_time += 1
+            self.game_time += 1 # Увеличиваем на 1 секунду
             self.last_time_update = current_time
 
-        if self.game_time >= 720:
-            self.game_time = 0
+        # Пример: день 12 минут (720 секунд) игрового времени = 12 реальных минут
+        # 12 игровых часов = 720 секунд игрового времени
+        # 1 игровой час = 60 секунд игрового времени
 
-        self.is_night = (self.game_time // 60) % 12 == 11
+        max_game_time = 720 # Максимальное игровое время в цикле
+
+        if self.game_time >= max_game_time:
+            self.save_changes()  # Сохраняем изменения
+
+            self.game_time = 0 # Сбрасываем игровое время в начало нового дня
+
+        # Пример: ночь с 11-го до 5-го часа (по циферблату)
+        # 11-й час начинается с (11 * 60) = 660 секунды
+        # 5-й час заканчивается в (5 * 60) = 300 секунд (на следующий день)
+        # То есть ночь с 660 до 720 (конец дня) и с 0 до 300 (начало дня)
+        self.is_night = (self.game_time >= 660) or (self.game_time < 300) # Исправлено условие для начала дня
 
     def render_map(self, screen):
         """Отрисовка карты"""
@@ -612,8 +616,59 @@ class GameManager:
                                  screen_y = y * tile_height - int(camera_offset.y)
                                  screen.blit(tile_image, (screen_x, screen_y))
 
+    def init_save_system(self):
+        """Инициализация системы сохранения (вызвать в __init__)"""
+        self.save_file = os.path.join('saves', 'map_changes.json')
+        os.makedirs('saves', exist_ok=True)
+        
+    def save_changes(self):
+        """Сохраняет текущие изменения (вызывать при смене дня/выходе)"""
+        if not hasattr(self, 'tile_states'):
+            return
+        
+        changes = {
+            'tiles': {},
+            'plants': {}
+        }
+        
+        # Сохраняем только измененные тайлы
+        for (x, y), state in self.tile_states.items():
+            if state.get('is_tilled'):
+                changes['tiles'][f"{x},{y}"] = {
+                    'grass_gid': self.grass_layer.data[y][x],
+                    'soil_gid': self.soil_layer.data[y][x] if hasattr(self, 'soil_layer') else 0
+                }
+        
+        # Сохраняем в файл
+        try:
+            with open(self.save_file, 'w', encoding='utf-8') as f:
+                json.dump(changes, f)
+            print(f"Сохранено {len(changes['tiles'])} изменений")
+        except Exception as e:
+            print(f"Ошибка сохранения: {e}")
+
+    def load_changes(self):
+        """Загружает сохраненные изменения (вызывать после загрузки карты)"""
+        if not os.path.exists(self.save_file):
+            return
+        
+        try:
+            with open(self.save_file, 'r', encoding='utf-8') as f:
+                changes = json.load(f)
+            
+            # Применяем изменения к тайлам
+            for coord, data in changes.get('tiles', {}).items():
+                x, y = map(int, coord.split(','))
+                if 0 <= x < self.tmx_data.width and 0 <= y < self.tmx_data.height:
+                    self.grass_layer.data[y][x] = data['grass_gid']
+                    if hasattr(self, 'soil_layer'):
+                        self.soil_layer.data[y][x] = data['soil_gid']
+                    self.tile_states[(x, y)] = {'is_tilled': True}
+            
+            print(f"Загружено {len(changes.get('tiles', {}))} изменений")
+        except Exception as e:
+            print(f"Ошибка загрузки: {e}")
     def toggle_fullscreen(self):
-        self.settings['fullscreen'] = not self.settings['fullscreen']
         self.screen_manager.toggle_screen_mode()
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
@@ -625,10 +680,12 @@ class GameManager:
         print(f"Переключен режим экрана, новые размеры: {screen.get_width()}x{screen.get_height()}")
 
     def set_sound_volume(self, volume):
+        self.save_manager.update('sound_volume', max(0.0, min(1.0, volume)))
         self.settings['sound_volume'] = max(0.0, min(1.0, volume))
         print(f"Установлена громкость звука: {volume}")
 
     def set_music_volume(self, volume):
+        self.save_manager.update('music_volume', max(0.0, min(1.0, volume)))
         self.settings['music_volume'] = max(0.0, min(1.0, volume))
         print(f"Установлена громкость музыки: {volume}")
 
@@ -644,6 +701,8 @@ class GameManager:
             self.handle_events()
             self.update()
             self.draw() # Метод draw теперь отвечает за отрисовку изменений
+
+        self.save_changes()
 
         self.save_settings()
         pygame.quit()
