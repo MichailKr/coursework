@@ -35,7 +35,7 @@ class RenderManager:
         screen.fill(self.COLORS['BLACK'])
 
         # Заголовок
-        title = self.title_font.render("Happy Farm", True, self.COLORS['WHITE'])
+        title = self.title_font.render("Ушастая усадьба", True, self.COLORS['WHITE'])
         title_rect = title.get_rect(center=(screen.get_width() // 2, 100))
         screen.blit(title, title_rect)
 

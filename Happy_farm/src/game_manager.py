@@ -55,7 +55,7 @@ class GameManager:
                 'right': pygame.K_d,
                 'interact': pygame.K_e,
                 'inventory': pygame.K_i,
-                'menu': pygame.K_ESCAPE
+                'menu': pygame.K_ESCAPE #настройки
             }
         }
 
