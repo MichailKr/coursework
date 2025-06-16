@@ -31,3 +31,4 @@ class Seed(Item):
         # Метод для посадки семени. Пока просто заглушка.
         print(f"Посажено семя {self.name} в {location}")
         pass
+

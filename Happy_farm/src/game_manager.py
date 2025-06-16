@@ -7,6 +7,7 @@ from src.render_manager import RenderManager
 from src.player import Player
 from src.camera import Camera
 from src.plant import Plant
+from src.Bridges import Bridge
 from src.item import Tool, Item, Seed # Импортируем также базовый класс Item
 import pytmx
 import os
@@ -174,6 +175,7 @@ class GameManager:
         self.fps_counter = 0
         self.fps_timer = pygame.time.get_ticks()
         self.shop = Shop(self)
+        self.bridge1 = Bridge(self, 1000, 1000, 15, 10)
 
         self.tile_states = {}  # Словарь или двумерный список для хранения состояния тайлов
 
@@ -390,48 +392,64 @@ class GameManager:
     def handle_events(self):
         """
         Обработка всех событий Pygame и их распределение по соответствующим менеджерам.
-        Включает обработку общих событий, инвентаря и взаимодействия с магазином.
+        Включает обработку общих событий, инвентаря, взаимодействия с магазином и мостом.
         """
         events = pygame.event.get()
         keys = pygame.key.get_pressed()  # Получаем состояние клавиш
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
-                return False # Сигнализируем, что игра должна завершиться
+                return False  # Сигнализируем, что игра должна завершиться
+
             # --- Передача события Event Handler ---
-            # Сначала обрабатываем общие события (меню, пауза и т.д.)
             if not self.event_handler.handle_events(event):
-                # Event Handler может установить self.running = False
-                # или изменить состояние игры (например, на GameState.QUIT)
-                # Если Event Handler возвращает False, завершаем обработку событий
                 return False
+
             # --- Передача события игроку ---
-            # Передаем событие игроку только если игра в состоянии GAME
             if self.state == GameState.GAME and hasattr(self, 'player') and self.player:
                 self.player.handle_input(event)
+
             # --- Передача события инвентарю ---
-            # Инвентарь должен обрабатывать события всегда, чтобы его можно было открыть/закрыть
             if hasattr(self, 'inventory_manager') and self.inventory_manager:
-                 self.inventory_manager.handle_input(event)
+                self.inventory_manager.handle_input(event)
+
             # --- Обработка взаимодействия с магазином ---
-            # Обрабатываем событие только если магазин инициализирован
             if hasattr(self, 'shop') and isinstance(self.shop, Shop):
-                 # Обработка открытия/закрытия магазина по клавише взаимодействия
-                 if event.type == pygame.KEYDOWN and event.key == self.settings['controls']['interact']:
-                     # Проверяем, находится ли игрок в зоне магазина и инвентарь закрыт
-                     if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
-                         self.shop.toggle_shop()
-                         print("Магазин открыт/закрыт")
-                     # Если магазин открыт, клики вне инвентаря могут быть для магазина
-                     elif self.shop.is_open:
-                          # Дополнительная логика для магазина при клике мыши (если нужна)
-                          if event.type == pygame.MOUSEBUTTONDOWN:
-                               pass # TODO: Добавить логику обработки кликов в магазине
-        # Вызов handle_input для магазина (если он открыт)
-        # Обработка ввода с клавиатуры в магазине (например, для выбора предметов)
+                if event.type == pygame.KEYDOWN and event.key == self.settings['controls']['interact']:
+                    if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                        self.shop.toggle_shop()
+                        print("Магазин открыт/закрыт")
+                    elif self.shop.is_open:
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            pass  # Можно добавить логику обработки кликов в магазине
+
+            # --- Обработка взаимодействия с мостом ---
+            # Предположим, что у вас есть список мостов self.bridges
+            if hasattr(self, 'bridge1'):
+                # Обработка открытия диалога отдачи ресурсов
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_e and self.bridge1.is_player_in_range():
+                        self.bridge1.toggle_dialog()
+                        print("Диалог отдачи ресурсов для моста открыт/закрыт")
+                # Обработка кликов мыши внутри диалога моста
+                if self.bridge1.show_dialog:
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        # Здесь можно добавить логику для обработки кликов по интерфейсу моста
+                        # например, выбор ресурса или подтверждение отдачи
+                        pass
+
+                # Обработка ввода с клавиатуры для интерфейса моста
+                if self.bridge1.show_dialog:
+                    self.bridge1.handle_input(keys, events)
+
+        # Вызов handle_input для магазина, если он открыт
         if hasattr(self, 'shop') and self.shop.is_open:
-            self.shop.handle_input(keys, events) # Передаем состояние клавиш и список событий
-        return True # Возвращаем True, если игра должна продолжаться
+            self.shop.handle_input(keys, events)
+
+        if self.bridge1.is_open:
+            self.bridge1.handle_input(keys, events)
+
+        return True  # Продолжаем игру
 
     def update(self):
         """Обновляет состояние игры"""
@@ -479,6 +497,7 @@ class GameManager:
             # Отрисовка интерфейса (всегда поверх всего остального)
             self.inventory_manager.draw(screen)
             self.shop.draw(screen)
+            self.bridge1.draw(screen)
             self.player.draw_coins(screen)
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
