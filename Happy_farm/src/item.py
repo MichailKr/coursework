@@ -106,3 +106,9 @@ class Wheat(Item):
         super().__init__("Пшеница", path, "crop", stackable=True, max_stack=99, quantity=quantity,
                          description=description, scale_to_size=scale_to_size)
         # self.quantity уже устанавливается в super().__init__
+
+class Mater(Item):
+    def __init__(self, name, image, mat_type):
+        # Семена стакаются (например, до 20 штук)
+        super().__init__(name, image, 'mat', stackable=True, max_stack=10)
+        self.mat_type = mat_type
