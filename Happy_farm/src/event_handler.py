@@ -1,10 +1,12 @@
 import pygame
 
+from src.save_manager import SaveManager
 from src.game_state import GameState
 
 class EventHandler:
     def __init__(self, game_manager):
         self.game_manager = game_manager
+        self.save_manager = SaveManager()
 
         # Области кнопок меню
         self.menu_buttons = {
@@ -84,7 +86,8 @@ class EventHandler:
             elif self.menu_buttons['settings'].collidepoint(pos):
                 self.game_manager.state = GameState.SETTINGS
             elif self.menu_buttons['exit'].collidepoint(pos):
-                exit()
+                print(self.game_manager.running)
+                self.game_manager.running = False
 
         elif self.game_manager.state == GameState.SETTINGS:
             # Проверка элементов настроек
@@ -124,12 +127,16 @@ class EventHandler:
 
             if slider_type == 'sound':
                 self.game_manager.settings['sound_volume'] = relative_x
+                self.save_manager.update('sound_volume', relative_x)
             elif slider_type == 'music':
                 self.game_manager.settings['music_volume'] = relative_x
+                self.save_manager.update('music_volume', relative_x)
             elif slider_type == 'fps':
                 self.game_manager.settings['fps_limit'] = int(relative_x * 120) + 30  # 30-150 FPS
+                self.save_manager.update('fps_limit', int(relative_x * 120) + 30)
 
     def toggle_fullscreen(self):
         """Переключение полноэкранного режима"""
         self.game_manager.settings['fullscreen'] = not self.game_manager.settings['fullscreen']
+        self.save_manager.update('fullscreen', self.game_manager.settings['fullscreen'])
         self.game_manager.toggle_fullscreen()

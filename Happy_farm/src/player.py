@@ -210,11 +210,15 @@ class Player(pygame.sprite.Sprite):
                     if 0 <= selected_item_index < len(self.game.inventory_manager.hotbar_slots):
                         selected_item = self.game.inventory_manager.hotbar_slots[selected_item_index]
                         # --- Проверяем, является ли предмет инструментом (например, мотыгой) ---
-                        if selected_item and isinstance(selected_item,
-                                                        Tool):  # Используем isinstance(selected_item, Tool)
-                            if selected_item.tool_type == 'hoe' and not self.is_using_tool:
-                                self.use_tool()  # Вызываем метод использования инструмента
-                            # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                        if selected_item and isinstance(selected_item, Tool): # Используем isinstance(selected_item, Tool)
+                             if selected_item.type == 'hoe' and not self.is_using_tool:
+                                 self.use_tool() # Вызываем метод использования инструмента
+                             # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                             # elif selected_item.type == 'axe' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию топора
+                             # elif selected_item.type == 'wateringcan' and not self.is_using_tool:
+                             #     self.use_tool() # Запускаем анимацию лейки
+                             # ...
                         # --- Проверяем, является ли предмет семенем ---
                         elif selected_item and isinstance(selected_item, Seed):
                             target_tile_x, target_tile_y = self.get_tile_in_front()
@@ -226,33 +230,26 @@ class Player(pygame.sprite.Sprite):
                                         selected_item.quantity -= 1
                                         if selected_item.quantity <= 0:
                                             # Удаляем предмет из инвентаря, если закончился
-                                            self.game.inventory_manager.hotbar_slots[
-                                                self.game.inventory_manager.selected_item_index] = None
-
+                                            self.game.inventory_manager.hotbar_slots[self.game.inventory_manager.selected_item_index] = None
+                                        
                                         # Создаем новое растение
-                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x,
-                                                          target_tile_y)
-
+                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x, target_tile_y)
+                                        
                                         # Добавляем растение в группы спрайтов
                                         if hasattr(self.game, 'all_sprites') and hasattr(self.game, 'plants'):
                                             self.game.all_sprites.add(new_plant)
                                             self.game.plants.add(new_plant)
-                                            print(
-                                                f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
-
+                                            print(f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
+                                        
                                         # Обновляем состояние тайла
                                         self.game.update_tile_state(target_tile_x, target_tile_y, has_plant=new_plant)
                                     else:
-                                        print(
-                                            f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
+                                        print(f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
                                 else:
                                     print("На этой земле нельзя сажать.")
                             else:
                                 print("Неверные координаты тайла или метод is_tile_plantable не найден в GameManager.")
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_g:
-                    self.harvest_plant()
+            # Обработка движения (клавиши get_pressed() обрабатываются в update)
             pass
 
     def update(self, dt):
@@ -448,7 +445,7 @@ class Player(pygame.sprite.Sprite):
         selected_item = inventory_manager.hotbar_slots[selected_item_index]
 
         if selected_item and isinstance(selected_item, Tool):
-            if selected_item.tool_type == 'hoe':
+            if selected_item.type == 'hoe':
                 self.is_using_tool = True
                 self.tool_use_animation_timer = 0
                 self.tool_use_current_frame = 0
@@ -500,36 +497,3 @@ class Player(pygame.sprite.Sprite):
         target_tile_y = max(0, min(target_tile_y, map_height_tiles - 1))
 
         return target_tile_x, target_tile_y
-
-    ### Работа с урожаем ###
-    def harvest_plant(self):
-        """Пытается собрать урожай с растения перед игроком."""
-        target_tile_x, target_tile_y = self.get_tile_in_front()
-        if self.game and hasattr(self.game, 'tile_states'):
-            tile_coords = (target_tile_x, target_tile_y)
-            tile_state = self.game.tile_states.get(tile_coords)
-            if tile_state and tile_state.get('has_plant'):
-                plant_obj = tile_state.get('has_plant')  # Получаем объект растения
-                if isinstance(plant_obj, Plant) and plant_obj.ready_to_harvest:
-                    # <<< ИЗМЕНЕНИЯ ЗДЕСЬ >>>
-                    harvested_item = plant_obj.harvest() # plant.harvest() теперь возвращает объект урожая (Tomato/Wheat)
-                    if harvested_item: # Если урожай был успешно получен (не None)
-                        plant_obj.kill()  # Удаляем спрайт растения
-                        # Обновляем состояние тайла
-                        self.game.update_tile_state(target_tile_x, target_tile_y, has_plant=False, is_tilled=True)
-                        # Добавляем полученный предмет урожая в инвентарь игрока
-                        if self.game.inventory_manager:
-                            # Предполагается, что add_item_to_inventory умеет работать с уже созданным объектом Item
-                            # и его количеством.
-                            self.game.inventory_manager.add_item(harvested_item, quantity=harvested_item.quantity)
-                            print(f"Игрок получил {harvested_item.quantity}x {harvested_item.name}!")
-                        else:
-                            print("Ошибка: InventoryManager не доступен для добавления урожая.")
-                    else:
-                        print(f"Растение {plant_obj.plant_type} на ({target_tile_x}, {target_tile_y}) не дало урожая.")
-                    # <<< КОНЕЦ ИЗМЕНЕНИЙ >>>
-                else:
-                    print(
-                        f"Растение на ({target_tile_x}, {target_tile_y}) еще не готово к сбору или не является растением.")
-            else:
-                print(f"На тайле ({target_tile_x}, {target_tile_y}) нет растения для сбора.")
