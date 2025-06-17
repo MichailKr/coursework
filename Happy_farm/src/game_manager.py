@@ -187,11 +187,14 @@ class GameManager:
             print(f"Ошибка загрузки карты: {e}")
             self.map_loaded = False
 
-
         screen = self.screen_manager.get_screen()
         self.camera = Camera(screen.get_width(), screen.get_height())
         print(f"Камера создана с размерами {screen.get_width()}x{screen.get_height()}")
 
+        # Установите желаемый уровень масштабирования здесь
+        self.camera.set_zoom(1.5)  # Например, 1.5 для 150% масштаба (ближе)
+        # Или 2.0 для 200% (еще ближе)
+        # 1.0 - это нормальный масштаб
         self.init_clock(screen)
 
         if self.map_loaded and hasattr(self, 'tmx_data'):
@@ -656,22 +659,30 @@ class GameManager:
             # Отрисовка только видимой части карты
             if self.map_loaded:
                 self.render_map(screen)
-            # Отрисовка всех спрайтов (включая игрока)
-            # Сортируем спрайты по нижней границе для правильной отрисовки (персонажи перед растениями)
-            all_sprites_except_plants = [s for s in self.all_sprites if
-                                         not isinstance(s, Plant)]  # Исключаем растения из основной группы отрисовки
+            # Отрисовка всех спрайтов (игрока, растений, NPC и т.д.)
+            # Сортируем спрайты по нижней границе для правильной отрисовки (ближе к нижней части экрана -> отрисовывается позже)
+            # is_tilled = tile_state.get('is_tilled', False)
             all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.centery)
             for sprite in all_sprites_sorted:
-                pos = self.camera.apply(sprite)
-                screen.blit(sprite.image, pos.topleft)
-            # !!! Отрисовка растений !!!
-            for plant_sprite in self.plants:
-                pos = self.camera.apply(plant_sprite)
-                screen.blit(plant_sprite.image, pos.topleft)
-            # Растения также являются спрайтами и будут отрисовываться вместе с all_sprites
-            # Если нужно отдельное управление отрисовкой растений, можно отрисовывать self.plants здесь
+                # Получаем масштабированный и смещенный прямоугольник для отрисовки
+                scaled_pos_rect = self.camera.apply(sprite)
+                # Масштабируем изображение спрайта
+                # NOTE: Это может быть неэффективно, если спрайты большие.
+                # Для оптимизации можно кэшировать масштабированные версии изображений,
+                # если масштаб камеры не меняется часто.
+                scaled_image = pygame.transform.scale(sprite.image, scaled_pos_rect.size)
+                screen.blit(scaled_image, scaled_pos_rect.topleft)
+            # Если self.plants - это просто подгруппа all_sprites, то этот блок не нужен.
+            # Если же вы храните растения отдельно и хотите их отрисовывать отдельно,
+            # то логика будет аналогична блоку выше для all_sprites.
+            # На данный момент, если Plant являются частью all_sprites, этот for-цикл избыточен.
+            # for plant_sprite in self.plants:
+            #     pos = self.camera.apply(plant_sprite)
+            #     scaled_image = pygame.transform.scale(plant_sprite.image, pos.size)
+            #     screen.blit(scaled_image, pos.topleft)
             self.draw_clock(screen)
             # Отрисовка интерфейса (всегда поверх всего остального)
+            # Предполагается, что UI-элементы не масштабируются камерой
             self.inventory_manager.draw(screen)
             self.shop.draw(screen)
             self.bridge1.draw(screen)
@@ -738,58 +749,72 @@ class GameManager:
         self.is_night = (self.game_time // 60) % 12 == 11
 
     def render_map(self, screen):
-        """Отрисовка карты"""
+        """Отрисовка карты с учетом масштаба камеры."""
         if not self.map_loaded or not self.tmx_data:
             return
-
-        # Получаем смещение камеры
-        camera_offset = self.camera.offset
-
-        # Размер тайла
+        camera_offset = self.camera.get_offset()  # Получаем смещение камеры
         tile_width = self.tmx_data.tilewidth
         tile_height = self.tmx_data.tileheight
-
+        zoom = self.camera.zoom
+        # Вычисляем масштабированные размеры тайлов
+        scaled_tile_width = int(tile_width * zoom)
+        scaled_tile_height = int(tile_height * zoom)
+        # Избегаем деления на ноль, если масштаб очень мал
+        if scaled_tile_width == 0: scaled_tile_width = 1
+        if scaled_tile_height == 0: scaled_tile_height = 1
         # Вычисляем видимую область в тайлах (с небольшим запасом)
-        start_x = int(camera_offset.x) // tile_width
-        end_x = start_x + (screen.get_width() // tile_width) + 2
-        start_y = int(camera_offset.y) // tile_height
-        end_y = start_y + (screen.get_height() // tile_height) + 2
-
-        # Ограничиваем индексы границами карты
-        start_x = max(0, start_x)
-        start_y = max(0, start_y)
-        end_x = min(self.tmx_data.width, end_x)
-        end_y = min(self.tmx_data.height, end_y)
-
+        # Учитываем, что camera_offset уже "масштабирован" внутри camera.update
+        start_x_pixel_on_map = camera_offset.x # Это левая граница видимой области карты в пикселях
+        start_y_pixel_on_map = camera_offset.y # Это верхняя граница видимой области карты в пикселях
+        start_x_tile = int(start_x_pixel_on_map // scaled_tile_width)
+        start_y_tile = int(start_y_pixel_on_map // scaled_tile_height)
+        end_x_tile = start_x_tile + int(screen.get_width() / scaled_tile_width) + 2  # Запас
+        end_y_tile = start_y_tile + int(screen.get_height() / scaled_tile_height) + 2 # Запас
+        # Ограничиваем индексы границами карты (в тайлах)
+        start_x_tile = max(0, start_x_tile)
+        start_y_tile = max(0, start_y_tile)
+        end_x_tile = min(self.tmx_data.width, end_x_tile)
+        end_y_tile = min(self.tmx_data.height, end_y_tile)
         # Отрисовка видимых тайлов слоев с данными
         for layer in self.tmx_data.visible_layers:
             # Отрисовываем только тайловые слои с данными
-            if isinstance(layer, pytmx.TiledTileLayer): # Проверяем, что это тайловый слой
-                 for y in range(start_y, end_y):
-                     for x in range(start_x, end_x):
-                         # Используем .tile для доступа к GID на позиции (x, y) в слое
-                         gid = layer.data[y][x] # Исправлено: доступ к данным слоя через .tile
-
-                         if gid != 0: # Проверяем, что это не пустая клетка
-                             # Получаем изображение тайла по GID
-                             tile_image = self.tmx_data.get_tile_image_by_gid(gid)
-
-                             if tile_image:
-                                 # Вычисляем позицию на экране
-                                 screen_x = x * tile_width - int(camera_offset.x)
-                                 screen_y = y * tile_height - int(camera_offset.y)
-                                 screen.blit(tile_image, (screen_x, screen_y))
+            if isinstance(layer, pytmx.TiledTileLayer):
+                for y in range(start_y_tile, end_y_tile):
+                    for x in range(start_x_tile, end_x_tile):
+                        gid = layer.data[y][x]
+                        if gid != 0:  # Проверяем, что это не пустая клетка
+                            tile_image = self.tmx_data.get_tile_image_by_gid(gid)
+                            if tile_image:
+                                # Масштабируем изображение тайла
+                                scaled_tile_image = pygame.transform.scale(tile_image, (scaled_tile_width, scaled_tile_height))
+                                # Вычисляем позицию на экране
+                                # (x * scaled_tile_width) - смещение_камеры_по_x
+                                screen_x = x * scaled_tile_width - int(camera_offset.x)
+                                screen_y = y * scaled_tile_height - int(camera_offset.y)
+                                screen.blit(scaled_tile_image, (screen_x, screen_y))
 
     def toggle_fullscreen(self):
         self.settings['fullscreen'] = not self.settings['fullscreen']
         self.screen_manager.toggle_screen_mode()
         screen = self.screen_manager.get_screen()
+        # Создаем новую камеру с новыми размерами экрана
         self.camera = Camera(screen.get_width(), screen.get_height())
+
+        # Переустанавливаем размеры карты для новой камеры
         if self.map_loaded and hasattr(self, 'tmx_data'):
             map_width = self.tmx_data.width * self.tmx_data.tilewidth
             map_height = self.tmx_data.height * self.tmx_data.tileheight
             self.camera.set_map_size(map_width, map_height)
-            self.init_clock(screen) # Переинициализируем часы после смены размера экрана
+
+        # Важно: Устанавливаем тот же уровень масштабирования, который был до переключения
+        # Или, если хотите, новый по умолчанию.
+        # Если вы инициализируете self.camera.zoom в Camera.__init__ как 1.5,
+        # то здесь достаточно просто создать новую камеру.
+        # Если же self.camera.zoom по умолчанию 1.0, а вы хотите 1.5, то нужно вызвать set_zoom:
+        self.camera.set_zoom(1.5)  # Убедитесь, что это значение соответствует вашему желаемому масштабу!
+
+        # Переинициализируем часы после смены размера экрана (для правильного позиционирования)
+        self.init_clock(screen)
         print(f"Переключен режим экрана, новые размеры: {screen.get_width()}x{screen.get_height()}")
 
     def set_sound_volume(self, volume):
