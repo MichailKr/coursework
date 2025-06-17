@@ -65,11 +65,13 @@ class Bridge:
                 for event in events:
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_e:
+                            # Переключаем состояние диалога (открываем или закрываем)
                             self.toggle_dialog()
                             return True
         else:
             # После постройки мост
             pass
+
         if self.show_dialog:
             for event in events:
                 if event.type == pygame.KEYDOWN:
@@ -77,31 +79,41 @@ class Bridge:
                         self.selected_resource_index = max(0, self.selected_resource_index - 1)
                         return True
                     elif event.key == pygame.K_DOWN:
-                        self.selected_resource_index = min(len(self.resources_needed) - 1, self.selected_resource_index + 1)
+                        self.selected_resource_index = min(len(self.resources_needed) - 1,
+                                                           self.selected_resource_index + 1)
                         return True
                     elif event.key in [pygame.K_RETURN, pygame.K_SPACE]:
                         self.attempt_give_resource()
                         return True
                     elif event.key == pygame.K_ESCAPE:
+                        # Закрываем диалог при нажатии ESC
                         self.toggle_dialog()
                         return True
+                    elif event.key == pygame.K_e:
+                        # Закрываем диалог при нажатии E
+                        self.toggle_dialog()
+                        return True
+
         return False
 
     def attempt_give_resource(self):
-        """Пытаемся отдать выбранный ресурс"""
-        resource = self.resources_needed[self.selected_resource_index]
+        """Пытаемся отдать все необходимые ресурсы одновременно."""
         inventory = self.game_manager.inventory_manager
+        all_resources_sufficient = True  # Флаг для проверки достаточности ресурсов
 
-        resource = self.resources_needed[self.selected_resource_index]
-        inventory = self.game_manager.inventory
-        resource = self.resources_needed[self.selected_resource_index]
-        if inventory.has_item(resource.item, resource.quantity):
-            inventory.remove_item_from_inventory(resource.item, resource.quantity)
+        # Проверяем, есть ли у игрока все необходимые ресурсы
+        for resource in self.resources_needed:
+            if not inventory.has_item(resource.item, resource.quantity):
+                all_resources_sufficient = False
+                print(f"Недостаточно ресурсов: {resource.quantity} {resource.item.name}")
+                break  # Прерываем цикл, если хотя бы одного ресурса не хватает
 
-        inventory.remove_item_from_inventory(resource.item, resource.quantity)
-        inventory.remove_itemprint(f"Отдано {resource.quantity} {resource.item.name}")
-        # Проверка, выполнены ли все требования
-        if all(inventory.has_item(r.item, r.quantity) for r in self.resources_needed):
+        # Если все ресурсы есть, удаляем их из инвентаря
+        if all_resources_sufficient:
+            for resource in self.resources_needed:
+                inventory.remove_item_from_inventory(resource.item, resource.quantity)
+                print(f"Отдано {resource.quantity} {resource.item.name}")
+
             self.build = True
             print("Мост построен!")
             self.toggle_dialog()
@@ -138,17 +150,31 @@ class Bridge:
         width, height = 400, 200
         x = (screen.get_width() - width) // 2
         y = (screen.get_height() - height) // 2
-        pygame.draw.rect(screen, (50,50,50), (x, y, width, height))
-        pygame.draw.rect(screen, (255,255,255), (x, y, width, height), 2)
+        pygame.draw.rect(screen, (50, 50, 50), (x, y, width, height))
+        pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 2)
 
-        title = self.font.render("Отдайте ресурсы для моста", True, (255,255,255))
+        title = self.font.render("Отдайте ресурсы для моста", True, (255, 255, 255))
         screen.blit(title, (x + 10, y + 10))
 
         for idx, res in enumerate(self.resources_needed):
-            color = (255,255,0) if idx == self.selected_resource_index else (255,255,255)
-            text_str = f"{res.item.name}: {res.quantity}"
-            text = self.small_font.render(text_str, True, color)
-            screen.blit(text, (x + 20, y + 50 + idx * 30))
+            item_image = pygame.transform.scale(res.item.image, (40, 40))
 
-        instructions = self.small_font.render("UP/DOWN - выбрать, ENTER - отдать, ESC - отмена", True, (200,200,200))
+            # Определяем координаты для изображения и текста
+            image_x = x + 10  # Отступ слева
+            image_y = y + 50 + idx * 30  # Вертикальная позиция для изображения
+
+            # Рисуем изображение
+            screen.blit(item_image, (image_x, image_y))
+
+            # Рисуем текст рядом с изображением
+            text_str = f"{res.item.name}: {res.quantity}"
+            text = self.small_font.render(text_str, True, (255, 255, 0))
+
+            # Вычисляем позицию текста так, чтобы он был на одном уровне с изображением
+            text_x = image_x + item_image.get_width() + 10  # Позиция текста справа от изображения
+            text_y = image_y + (item_image.get_height() - text.get_height()) // 2  # Центрируем текст по вертикали
+
+            screen.blit(text, (text_x, text_y))
+
+        instructions = self.small_font.render("UP/DOWN - выбрать, ENTER - отдать, ESC - отмена", True, (200, 200, 200))
         screen.blit(instructions, (x + 10, y + height - 30))

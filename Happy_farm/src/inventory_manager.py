@@ -794,6 +794,25 @@ class InventoryManager:
                 text_rect = quantity_text.get_rect(bottomright=(slot_x + slot_size - 5, slot_y + slot_size - 5))
                 screen.blit(quantity_text, text_rect)
 
+    def has_item(self, item_to_check, quantity):
+        """
+        Проверяет, есть ли указанный предмет в инвентаре или хотбаре в необходимом количестве.
+        Возвращает True, если предмет найден в достаточном количестве, и False в противном случае.
+        """
+        total_quantity = 0
+
+        # Проверяем хотбар
+        for current_item in self.hotbar_slots:
+            if current_item and current_item.name == item_to_check.name:
+                total_quantity += current_item.quantity  # Предполагается, что у каждого предмета есть атрибут quantity
+
+        # Проверяем основной инвентарь
+        for current_item in self.hotbar_slots:
+            if current_item and current_item.name == item_to_check.name:
+                total_quantity += current_item.quantity  # Предполагается, что у каждого предмета есть атрибут quantity
+
+        return total_quantity >= quantity  # Проверяем, достаточно ли предметов
+
     def remove_item_from_inventory(self, item_to_remove, quantity=1):
         """
         Удаляет указанное количество предмета из инвентаря или хотбара.
