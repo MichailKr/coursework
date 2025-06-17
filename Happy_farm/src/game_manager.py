@@ -49,7 +49,7 @@ class GameManager:
         self.player_near_bed = False
 
         # игровое время
-        self.game_time = 300 # Начинаем с начала дня для отладки
+        self.game_time = 650 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
 
         # затемнение
