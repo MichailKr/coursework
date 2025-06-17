@@ -1,7 +1,7 @@
 # shop.py
 import pygame
 import os
-from src.item import Item, Tool, Seed
+from src.item import Item, Tool, Seed, Mater
 
 class ShopItem:
     """Класс для предметов в магазине"""
@@ -58,20 +58,26 @@ class Shop:
         # Пути к спрайтам
         item_sprites_seed_path = os.path.join("sprites", "items")
         item_sprites_plants = os.path.join("sprites", "plants", "grownPlants")
+        item_sprites_mat_path = os.path.join("sprites", "materials")
 
         try:
             # Загружаем изображения для семян (только для покупки)
             wheat_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "wheat_plant.png")).convert_alpha()
             tomato_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "tomato_plant.png")).convert_alpha()
-            
-            # Создаем экземпляры семян для магазина
+            brick_image = pygame.image.load(os.path.join(item_sprites_mat_path, "brick.png")).convert_alpha()
+            wood_image = pygame.image.load(os.path.join(item_sprites_mat_path, "wood.png")).convert_alpha()
+
+            bricks = Mater("Кирпичи", brick_image, "brick")
+            wood = Mater("Доски", wood_image, "wood")
             wheat_seed = Seed("Семена пшеницы", wheat_seed_image, "wheat")
             tomato_seed = Seed("Семена томатов", tomato_seed_image, "tomato")
             
             # Добавляем в магазин семена (только для покупки)
             items.append(ShopItem(wheat_seed, 20, 0))  # sell_price=0 - нельзя продать
             items.append(ShopItem(tomato_seed, 30, 0))  # sell_price=0 - нельзя продать
-            
+            items.append(ShopItem(bricks, 200, 0))  # sell_price=0 - нельзя продать
+            items.append(ShopItem(wood, 150, 0))  # sell_price=0 - нельзя продать
+
             # Загружаем изображения растений (только для продажи)
             wheat_plant_image = pygame.image.load(os.path.join(item_sprites_plants, "wheat.png")).convert_alpha()
             tomato_plant_image = pygame.image.load(os.path.join(item_sprites_plants, "tomato.png")).convert_alpha()
@@ -245,7 +251,7 @@ class Shop:
         """Отрисовка окна магазина"""
         # Размеры окна магазина
         window_width = 600
-        window_height = 400
+        window_height = 500
         window_x = (screen.get_width() - window_width) // 2
         window_y = (screen.get_height() - window_height) // 2
         # Фон окна
