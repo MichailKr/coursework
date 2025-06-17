@@ -1,6 +1,6 @@
 import pygame
-from src.game_state import GameState
 
+from src.game_state import GameState
 
 class EventHandler:
     def __init__(self, game_manager):
@@ -21,54 +21,59 @@ class EventHandler:
             'fps_slider': pygame.Rect(300, 360, 200, 20),
             'back': pygame.Rect(0, 0, 200, 50)  # Кнопка "Назад"
         }
-
         self.dragging = None
 
     def update_button_positions(self, screen):
         """Обновление позиций кнопок меню"""
         screen_center_x = screen.get_width() // 2
-
         # Обновление позиций кнопок меню
         self.menu_buttons['play'].centerx = screen_center_x
         self.menu_buttons['play'].top = 250
-
         self.menu_buttons['settings'].centerx = screen_center_x
         self.menu_buttons['settings'].top = 320
-
         self.menu_buttons['exit'].centerx = screen_center_x
         self.menu_buttons['exit'].top = 390
-
         # Обновление позиции кнопки "Назад"
         self.settings_elements['back'].centerx = screen_center_x
         self.settings_elements['back'].bottom = screen.get_height() - 30
 
-    def handle_events(self):
-        """Обработка всех событий"""
+    # --- Измените метод handle_events ---
+    # Теперь этот метод принимает одно событие за раз
+    def handle_events(self, event): # Добавлен аргумент 'event'
+        """Обработка одного события Pygame."""
         screen = self.game_manager.screen_manager.get_screen()
-        self.update_button_positions(screen)
+        self.update_button_positions(screen) # Возможно, обновление позиций лучше делать в другом месте, но пока оставим здесь
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return False
+        # --- Удалите цикл for event in pygame.event.get(): ---
+        # События теперь получаются и передаются из GameManager
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if self.game_manager.state == GameState.GAME:
-                        self.game_manager.state = GameState.MENU
+        if event.type == pygame.QUIT:
+            return False # Сигнализируем GameManager о выходе из игры
 
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Левая кнопка мыши
-                    self.handle_mouse_down(event.pos)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.game_manager.state == GameState.GAME:
+                    self.game_manager.state = GameState.MENU
+            # TODO: Добавьте здесь обработку других клавиш, не связанных с инвентарем (например, движение игрока)
+            # if event.key == self.game_manager.settings['controls']['up']:
+            #      self.game_manager.player.move(0, -1)
+            # ... другие клавиши движения ...
 
-            if event.type == pygame.MOUSEBUTTONUP:
-                if event.button == 1:
-                    self.handle_mouse_up(event.pos)
 
-            if event.type == pygame.MOUSEMOTION:
-                if self.dragging:
-                    self.handle_mouse_motion(event.pos)
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:  # Левая кнопка мыши
+                self.handle_mouse_down(event.pos)
 
-        return True
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.handle_mouse_up(event.pos)
+
+        if event.type == pygame.MOUSEMOTION:
+            if self.dragging:
+                self.handle_mouse_motion(event.pos)
+
+        return True # Продолжаем игру
+    # --- Конец изменения ---
 
     def handle_mouse_down(self, pos):
         """Обработка нажатия кнопки мыши"""
@@ -97,7 +102,10 @@ class EventHandler:
             elif self.settings_elements['fullscreen'].collidepoint(pos):
                 self.toggle_fullscreen()
 
-        return True
+        # TODO: Возможно, здесь должна быть обработка кликов в игре, не связанных с инвентарем или UI
+        # Например, взаимодействие с объектами мира
+
+        return True # Этот return в handle_mouse_down не влияет на цикл событий, он для внутренней логики
 
     def handle_mouse_up(self, pos):
         """Обработка отпускания кнопки мыши"""
