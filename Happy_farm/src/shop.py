@@ -1,7 +1,7 @@
 # shop.py
 import pygame
 import os
-from src.item import Item, Tool, Seed
+from src.item import Item, Tool, Seed, Mater
 
 class ShopItem:
     """Класс для предметов в магазине"""
@@ -58,12 +58,19 @@ class Shop:
         # Пути к спрайтам
         item_sprites_seed_path = os.path.join("sprites", "items")
         item_sprites_plants = os.path.join("sprites", "plants", "grownPlants")
+        item_sprites_m_path = os.path.join("sprites", "materials")
+
 
         try:
             # Загружаем изображения для семян (только для покупки)
             wheat_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "wheat_plant.png")).convert_alpha()
             tomato_seed_image = pygame.image.load(os.path.join(item_sprites_seed_path, "tomato_plant.png")).convert_alpha()
-            
+            brick_image = pygame.image.load(os.path.join(item_sprites_m_path, "brick.png")).convert_alpha()
+            wood_image = pygame.image.load(os.path.join(item_sprites_m_path, "wood.png")).convert_alpha()
+
+            # Предположим, что у вас есть ресурсы "Кирпичи" и "Доски"
+            bricks = Mater("Кирпичи", brick_image, "brick")
+            wood = Mater("Доски", wood_image, "wood")
             # Создаем экземпляры семян для магазина
             wheat_seed = Seed("Семена пшеницы", wheat_seed_image, "wheat")
             tomato_seed = Seed("Семена томатов", tomato_seed_image, "tomato")
@@ -71,6 +78,8 @@ class Shop:
             # Добавляем в магазин семена (только для покупки)
             items.append(ShopItem(wheat_seed, 20, 0))  # sell_price=0 - нельзя продать
             items.append(ShopItem(tomato_seed, 30, 0))  # sell_price=0 - нельзя продать
+            items.append(ShopItem(bricks, 200, 0))  # sell_price=0 - нельзя продать
+            items.append(ShopItem(wood, 150, 0))  # sell_price=0 - нельзя продать
             
             # Загружаем изображения растений (только для продажи)
             wheat_plant_image = pygame.image.load(os.path.join(item_sprites_plants, "wheat.png")).convert_alpha()
@@ -173,14 +182,14 @@ class Shop:
             player.remove_coins(shop_item.buy_price)
             if hasattr(self.game_manager, 'inventory_manager'):
                 # Создаем копию предмета с начальным количеством
-                new_item = type(shop_item.item)(shop_item.item.name, shop_item.item.image, shop_item.item.type)
+                new_item = type(shop_item.item)(shop_item.item.name, shop_item.item.image, shop_item.item.item_type)
                 # Копируем все атрибуты из исходного предмета
                 for attr, value in shop_item.item.__dict__.items():
                     if attr not in ['name', 'image', 'type', 'stackable', 'max_stack', 'quantity']:
                         setattr(new_item, attr, value)
                 new_item.quantity = 5  # Например, покупаем 5 семян за раз
                 
-                success = self.game_manager.inventory_manager.add_item_to_inventory(new_item)
+                success = self.game_manager.inventory_manager.add_item_by_slot_or_find(new_item)
                 if not success:
                     player.add_coins(shop_item.buy_price)
 
@@ -245,7 +254,7 @@ class Shop:
         """Отрисовка окна магазина"""
         # Размеры окна магазина
         window_width = 600
-        window_height = 400
+        window_height = 500
         window_x = (screen.get_width() - window_width) // 2
         window_y = (screen.get_height() - window_height) // 2
         # Фон окна

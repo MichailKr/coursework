@@ -35,10 +35,10 @@ class Bridge:
     def init_resources(self):
         """Задаем ресурсы, необходимые для постройки моста"""
 
-        item_sprites_seed_path = os.path.join("sprites", "materials")
+        item_sprites_m_path = os.path.join("sprites", "materials")
 
-        brick_image = pygame.image.load(os.path.join(item_sprites_seed_path, "brick.png")).convert_alpha()
-        wood_image = pygame.image.load(os.path.join(item_sprites_seed_path, "wood.png")).convert_alpha()
+        brick_image = pygame.image.load(os.path.join(item_sprites_m_path, "brick.png")).convert_alpha()
+        wood_image = pygame.image.load(os.path.join(item_sprites_m_path, "wood.png")).convert_alpha()
 
         # Предположим, что у вас есть ресурсы "Кирпичи" и "Доски"
         bricks = Mater("Кирпичи", brick_image, "brick")
