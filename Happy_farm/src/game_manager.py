@@ -40,6 +40,14 @@ class GameManager:
         self.clock_arrow = None
         self.clock_pos = None
 
+        self.night_timer_start = 0
+        self.night_timer_duration = 60  # 60 секунд на возвращение домой
+        self.show_night_warning = False
+        self.night_warning_alpha = 0
+        self.night_warning_fade_in = True
+        self.bed_rect = pygame.Rect(1290, 768, 16, 16)
+        self.player_near_bed = False
+
         # игровое время
         self.game_time = 300 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
@@ -396,6 +404,10 @@ class GameManager:
             if event.type == pygame.QUIT:
                 self.running = False
                 return False  # Сигнализируем, что игра должна завершиться
+            
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_e and self.player_near_bed and self.is_night:
+                self.skip_night()
+                return True
 
             # --- Передача события Event Handler ---
             if not self.event_handler.handle_events(event):
@@ -450,13 +462,23 @@ class GameManager:
     def update(self):
         """Обновляет состояние игры"""
         delta_time = self.clock.tick(self.settings['fps_limit']) / 1000.0
+        
+        # Проверка нахождения игрока рядом с кроватью
+        if hasattr(self, 'player'):
+            player_rect = self.player.rect.copy()
+            player_rect.x -= self.camera.offset.x
+            player_rect.y -= self.camera.offset.y
+            bed_rect = self.bed_rect.copy()
+            bed_rect.x -= self.camera.offset.x
+            bed_rect.y -= self.camera.offset.y
+            self.player_near_bed = player_rect.colliderect(bed_rect)
+        
         if self.state == GameState.GAME and not self.paused:
-            # Сначала обновляем спрайты (включая игрока и растения)
             self.all_sprites.update(delta_time)
-            self.plants.update(delta_time) # !!! Обновляем группу растений !!!
-            # Обновляем камеру, привязывая её к игроку
+            self.plants.update(delta_time)
             self.camera.update(self.player)
             self.update_clock()
+            
             # Подсчёт FPS
             self.fps_counter += 1
             current_time = pygame.time.get_ticks()
@@ -473,35 +495,38 @@ class GameManager:
         elif self.state == GameState.SETTINGS:
             self.render_manager.draw_settings(self)
         elif self.state == GameState.GAME:
-            # Очистка экрана
-            screen.fill((50, 50, 50))  # Серый фон
-            # Отрисовка только видимой части карты
+            screen.fill((50, 50, 50))
+            
             if self.map_loaded:
                 self.render_map(screen)
-            # Отрисовка всех спрайтов (включая игрока)
-            # Сортируем спрайты по нижней границе для правильной отрисовки (персонажи перед растениями)
-            all_sprites_except_plants = [s for s in self.all_sprites if
-                                         not isinstance(s, Plant)]  # Исключаем растения из основной группы отрисовки
+                
             all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.centery)
             for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
-            # !!! Отрисовка растений !!!
+                
             for plant_sprite in self.plants:
                 pos = self.camera.apply(plant_sprite)
                 screen.blit(plant_sprite.image, pos.topleft)
-            # Растения также являются спрайтами и будут отрисовываться вместе с all_sprites
-            # Если нужно отдельное управление отрисовкой растений, можно отрисовывать self.plants здесь
+                
             self.draw_clock(screen)
-            # Отрисовка интерфейса (всегда поверх всего остального)
+            
+            # Отрисовка подсказки у кровати
+            if self.player_near_bed and self.is_night:
+                self.draw_bed_hint(screen)
+                
+            if self.show_night_warning:
+                self.draw_night_warning(screen)
+                self.draw_night_timer(screen)
+                
             self.inventory_manager.draw(screen)
             self.shop.draw(screen)
             self.bridge1.draw(screen)
             self.player.draw_coins(screen)
-            # Отрисовка FPS (для отладки)
+            
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
             screen.blit(fps_text, (10, 10))
-        # Обновление экрана
+            
         pygame.display.flip()
 
     def init_clock(self, screen):
@@ -584,31 +609,45 @@ class GameManager:
             print("Предупреждение: night_overlay не инициализирован, но is_night = True.")
 
     def update_clock(self):
-        # для дебага
-        # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
-
         current_time = time.time()
-        # Обновляем игровое время каждую секунду реального времени
+        
         if current_time - self.last_time_update >= 1:
-            self.game_time += 1 # Увеличиваем на 1 секунду
+            self.game_time += 1
             self.last_time_update = current_time
 
-        # Пример: день 12 минут (720 секунд) игрового времени = 12 реальных минут
-        # 12 игровых часов = 720 секунд игрового времени
-        # 1 игровой час = 60 секунд игрового времени
+        max_game_time = 720
 
-        max_game_time = 720 # Максимальное игровое время в цикле
+        # Проверяем наступление ночи
+        new_night_state = (self.game_time >= 660) or (self.game_time < 300)
+        
+        if new_night_state and not self.is_night:
+            self.start_night_timer()
+            
+        self.is_night = new_night_state
+        
+        if not self.is_night and self.show_night_warning:
+            self.reset_night_timer()
+            
+        # Обновляем пульсацию надписи
+        if self.show_night_warning:
+            if self.night_warning_fade_in:
+                self.night_warning_alpha += 5
+                if self.night_warning_alpha >= 255:
+                    self.night_warning_alpha = 255
+                    self.night_warning_fade_in = False
+            else:
+                self.night_warning_alpha -= 5
+                if self.night_warning_alpha <= 100:
+                    self.night_warning_alpha = 100
+                    self.night_warning_fade_in = True
+
+        # Проверяем таймер ночи
+        if self.show_night_warning and time.time() - self.night_timer_start >= self.night_timer_duration:
+            self.handle_night_timeout()
 
         if self.game_time >= max_game_time:
-            self.save_changes()  # Сохраняем изменения
-
-            self.game_time = 0 # Сбрасываем игровое время в начало нового дня
-
-        # Пример: ночь с 11-го до 5-го часа (по циферблату)
-        # 11-й час начинается с (11 * 60) = 660 секунды
-        # 5-й час заканчивается в (5 * 60) = 300 секунд (на следующий день)
-        # То есть ночь с 660 до 720 (конец дня) и с 0 до 300 (начало дня)
-        self.is_night = (self.game_time >= 660) or (self.game_time < 300) # Исправлено условие для начала дня
+            self.save_changes()
+            self.game_time = 0
 
     def render_map(self, screen):
         """Отрисовка карты"""
@@ -815,3 +854,89 @@ class GameManager:
                             return True # Найдена коллизия
 
         return False # Коллизий не найдено
+    def start_night_timer(self):
+        """Запускает таймер ночи"""
+        self.night_timer_start = time.time()
+        self.show_night_warning = True
+        self.night_warning_alpha = 0
+        self.night_warning_fade_in = True
+        print("Началась ночь! Беги домой!")
+    
+    def reset_night_timer(self):
+        """Сбрасывает таймер ночи"""
+        self.show_night_warning = False
+        self.night_warning_alpha = 0
+        print("Ночь закончилась, таймер сброшен")
+
+    def handle_night_timeout(self):
+        """Обрабатывает истечение времени ночи"""
+        if not self.player_near_bed:
+            # Игрок не успел добраться до кровати - выход в меню
+            print("Игрок не успел добраться до кровати! Возврат в меню.")
+            self.state = GameState.MENU
+            self.reset_night_timer()
+        else:
+            self.skip_night()
+        
+        # Переход к утру
+        self.game_time = 300  # Устанавливаем утреннее время
+        self.reset_night_timer()
+        print("Наступило утро")
+
+    def check_player_in_bed(self):
+        """Проверяет, находится ли игрок на кровати"""
+        if not hasattr(self, 'player'):
+            return False
+            
+        # Проверяем коллизию игрока с кроватью
+        player_rect = pygame.Rect(
+            self.player.rect.x - self.camera.offset.x,
+            self.player.rect.y - self.camera.offset.y,
+            self.player.rect.width,
+            self.player.rect.height
+        )
+        
+        # Для проверки используем глобальные координаты кровати
+        bed_rect = self.bed_rect.copy()
+        bed_rect.x -= self.camera.offset.x
+        bed_rect.y -= self.camera.offset.y
+        
+        return player_rect.colliderect(bed_rect)
+    
+    def draw_night_warning(self, screen):
+        """Отрисовывает пульсирующее предупреждение 'БЕГИ ДОМОЙ!'"""
+        warning_text = self.fonts['large'].render("БЕГИ ДОМОЙ!!!", True, (255, 50, 50))
+        text_rect = warning_text.get_rect(center=(screen.get_width()//2, screen.get_height()//3))
+        
+        # Создаем поверхность с альфа-каналом для плавного исчезновения
+        warning_surface = pygame.Surface((text_rect.width, text_rect.height), pygame.SRCALPHA)
+        warning_surface.blit(warning_text, (0, 0))
+        warning_surface.set_alpha(self.night_warning_alpha)
+        
+        screen.blit(warning_surface, text_rect.topleft)
+
+    def draw_night_timer(self, screen):
+        """Отрисовывает таймер ночи под часами"""
+        remaining_time = max(0, self.night_timer_duration - (time.time() - self.night_timer_start))
+        timer_text = f"{int(remaining_time)} сек"
+        
+        # Позиция под часами
+        timer_pos = (self.clock_pos[0] + self.clock_size//2, 
+                    self.clock_pos[1] + self.clock_size + 10)
+        
+        # Отрисовка текста таймера
+        timer_surface = self.fonts['medium'].render(timer_text, True, (255, 255, 255))
+        timer_rect = timer_surface.get_rect(center=(timer_pos[0], timer_pos[1]))
+        screen.blit(timer_surface, timer_rect.topleft)
+
+    def skip_night(self):
+        """Пропускает ночь, когда игрок ложится спать"""
+        self.game_time = 300  # Устанавливаем утреннее время
+        self.reset_night_timer()
+        print("Игрок лег спать, наступило утро")
+
+    def draw_bed_hint(self, screen):
+        """Отрисовывает подсказку у кровати"""
+        hint_text = self.fonts['small'].render("Нажмите E чтобы лечь спать", True, (255, 255, 255))
+        hint_rect = hint_text.get_rect(center=(screen.get_width()//2, screen.get_height()//2 + 50))
+        screen.blit(hint_text, hint_rect.topleft)
