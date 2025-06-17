@@ -1,4 +1,162 @@
 
+==================== Bridges.py ====================
+
+#  мост.py
+import pygame
+import os
+from src.item import Item, Mater
+
+
+class ShopItem:
+    """Класс для предметов, нужных при создании моста"""
+
+    def __init__(self, item, quantity):
+        self.item = item
+        self.quantity = quantity
+
+class Bridge:
+
+    """Класс моста с интерфейсом отдачи ресурсов"""
+
+    def __init__(self, game_manager, x, y, q1, q2):
+        self.build = False  # Статус построенности моста
+        self.game_manager = game_manager
+        self.x = x
+        self.y = y
+        self.quantity_wood = q1
+        self.quantity_brick = q2
+        self.is_open = True
+        self.font = pygame.font.SysFont('Arial', 20)
+        self.small_font = pygame.font.SysFont('Arial', 14)
+        self.resources_needed = []  # Список ресурсов для построения
+        self.selected_resource_index = 0
+        self.show_dialog = False
+
+        # Инициализация ресурсов, необходимых для построения
+        self.init_resources()
+
+    def init_resources(self):
+        """Задаем ресурсы, необходимые для постройки моста"""
+
+        item_sprites_seed_path = os.path.join("sprites", "materials")
+
+        brick_image = pygame.image.load(os.path.join(item_sprites_seed_path, "brick.png")).convert_alpha()
+        wood_image = pygame.image.load(os.path.join(item_sprites_seed_path, "wood.png")).convert_alpha()
+
+        # Предположим, что у вас есть ресурсы "Кирпичи" и "Доски"
+        bricks = Mater("Кирпичи", brick_image, "brick")
+        wood = Mater("Доски", wood_image, "wood")
+        self.resources_needed = [
+        ShopItem(bricks, self.quantity_brick),
+        ShopItem(wood, self.quantity_wood)
+        ]
+
+    def toggle_dialog(self):
+        self.show_dialog = not self.show_dialog
+
+    def is_player_in_range(self):
+        """Проверка, в радиусе ли игрок"""
+        player = self.game_manager.player
+        distance = ((player.rect.centerx - self.x) ** 2 +
+                    (player.rect.centery - self.y) ** 2) ** 0.5
+        return distance <= 50  # радиус для взаимодействия
+
+    def handle_input(self, keys, events):
+        """Обработка ввода для интерфейса отдачи ресурсов"""
+        if not self.build:
+            if self.is_player_in_range():
+                for event in events:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_e:
+                            self.toggle_dialog()
+                            return True
+        else:
+            # После постройки мост
+            pass
+        if self.show_dialog:
+            for event in events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_UP:
+                        self.selected_resource_index = max(0, self.selected_resource_index - 1)
+                        return True
+                    elif event.key == pygame.K_DOWN:
+                        self.selected_resource_index = min(len(self.resources_needed) - 1, self.selected_resource_index + 1)
+                        return True
+                    elif event.key in [pygame.K_RETURN, pygame.K_SPACE]:
+                        self.attempt_give_resource()
+                        return True
+                    elif event.key == pygame.K_ESCAPE:
+                        self.toggle_dialog()
+                        return True
+        return False
+
+    def attempt_give_resource(self):
+        """Пытаемся отдать выбранный ресурс"""
+        resource = self.resources_needed[self.selected_resource_index]
+        inventory = self.game_manager.inventory_manager
+
+        resource = self.resources_needed[self.selected_resource_index]
+        inventory = self.game_manager.inventory
+        resource = self.resources_needed[self.selected_resource_index]
+        if inventory.has_item(resource.item, resource.quantity):
+            inventory.remove_item_from_inventory(resource.item, resource.quantity)
+
+        inventory.remove_item_from_inventory(resource.item, resource.quantity)
+        inventory.remove_itemprint(f"Отдано {resource.quantity} {resource.item.name}")
+        # Проверка, выполнены ли все требования
+        if all(inventory.has_item(r.item, r.quantity) for r in self.resources_needed):
+            self.build = True
+            print("Мост построен!")
+            self.toggle_dialog()
+        else:
+            print("Недостаточно ресурсов для отдачи.")
+
+    def draw(self, screen):
+        """Отрисовка интерфейса"""
+        if not self.build:
+            if self.is_player_in_range():
+                self.draw_hint(screen)
+            if self.show_dialog:
+                self.draw_dialog(screen)
+
+            else:
+                # Мост построен, можно показывать его
+                pass
+
+    def draw_hint(self, screen):
+        """Отрисовка подсказки об открытии магазина"""
+        hint_text = "Нажмите E для открытия моста"
+        text_surface = self.font.render(hint_text, True, (255, 255, 255))
+        # Позиционируем текст по центру экрана внизу
+        text_rect = text_surface.get_rect()
+        text_rect.centerx = screen.get_width() // 2
+        text_rect.y = screen.get_height() - 150
+        # Фон для текста
+        bg_rect = text_rect.inflate(20, 10)
+        pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=5)
+        screen.blit(text_surface, text_rect)
+
+    def draw_dialog(self, screen):
+        # Окно отдачи ресурсов
+        width, height = 400, 200
+        x = (screen.get_width() - width) // 2
+        y = (screen.get_height() - height) // 2
+        pygame.draw.rect(screen, (50,50,50), (x, y, width, height))
+        pygame.draw.rect(screen, (255,255,255), (x, y, width, height), 2)
+
+        title = self.font.render("Отдайте ресурсы для моста", True, (255,255,255))
+        screen.blit(title, (x + 10, y + 10))
+
+        for idx, res in enumerate(self.resources_needed):
+            color = (255,255,0) if idx == self.selected_resource_index else (255,255,255)
+            text_str = f"{res.item.name}: {res.quantity}"
+            text = self.small_font.render(text_str, True, color)
+            screen.blit(text, (x + 20, y + 50 + idx * 30))
+
+        instructions = self.small_font.render("UP/DOWN - выбрать, ENTER - отдать, ESC - отмена", True, (200,200,200))
+        screen.blit(instructions, (x + 10, y + height - 30))
+
+
 ==================== camera.py ====================
 
 import pygame
@@ -237,6 +395,104 @@ class EventHandler:
         self.game_manager.settings['fullscreen'] = not self.game_manager.settings['fullscreen']
         self.game_manager.toggle_fullscreen()
 
+    def handle_mouse_down_inventory(self, pos):
+        if self.game_manager.state == GameState.GAME:
+            # Check hotbar slots
+            for i, item in enumerate(self.game_manager.hotbar_slots):
+                slot_rect = self.get_hotbar_slot_rect(i)
+                if slot_rect.collidepoint(pos) and item:
+                    self.game_manager.dragged_item = item
+                    item.dragging = True
+                    item.original_pos = (i, None)  # (hotbar_index, None)
+                    return
+
+            # Check inventory slots if inventory is open
+            if self.game_manager.inventory_open:
+                for row in range(8):
+                    for col in range(3):
+                        slot_rect = self.get_inventory_slot_rect(row, col)
+                        if slot_rect.collidepoint(pos):
+                            item = self.game_manager.inventory_slots[row][col]
+                            if item:
+                                self.game_manager.dragged_item = item
+                                item.dragging = True
+                                item.original_pos = (row, col)
+                                return
+
+    def handle_mouse_up_inventory(self, pos):
+        if self.game_manager.dragged_item:
+            item = self.game_manager.dragged_item
+
+            # Check hotbar slots
+            for i in range(len(self.game_manager.hotbar_slots)):
+                slot_rect = self.get_hotbar_slot_rect(i)
+                if slot_rect.collidepoint(pos):
+                    self.place_item_in_hotbar(item, i)
+                    return
+
+            # Check inventory slots
+            if self.game_manager.inventory_open:
+                for row in range(8):
+                    for col in range(3):
+                        slot_rect = self.get_inventory_slot_rect(row, col)
+                        if slot_rect.collidepoint(pos):
+                            self.place_item_in_inventory(item, row, col)
+                            return
+
+            # If dropped outside, return to original position
+            if item.original_pos[1] is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[item.original_pos[0]] = item
+            else:  # Was in inventory
+                row, col = item.original_pos
+                self.game_manager.inventory_slots[row][col] = item
+
+            item.dragging = False
+            self.game_manager.dragged_item = None
+
+    def get_hotbar_slot_rect(self, index):
+        screen = self.game_manager.screen_manager.get_screen()
+        slot_size = 60
+        start_x = (screen.get_width() - (8 * slot_size)) // 2
+        return pygame.Rect(start_x + (index * slot_size), screen.get_height() - 80, slot_size, slot_size)
+
+    def get_inventory_slot_rect(self, row, col):
+        screen = self.game_manager.screen_manager.get_screen()
+        slot_size = 70
+        start_x = (screen.get_width() - (3 * slot_size)) // 2
+        start_y = (screen.get_height() - (8 * slot_size)) // 2
+        return pygame.Rect(start_x + (col * slot_size), start_y + (row * slot_size), slot_size, slot_size)
+
+    def place_item_in_hotbar(self, item, slot_index):
+        # Swap items if slot is occupied
+        current_item = self.game_manager.hotbar_slots[slot_index]
+        self.game_manager.hotbar_slots[slot_index] = item
+
+        if current_item:
+            row, col = item.original_pos
+            if col is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[row] = current_item
+            else:  # Was in inventory
+                self.game_manager.inventory_slots[row][col] = current_item
+
+        item.dragging = False
+        self.game_manager.dragged_item = None
+
+    def place_item_in_inventory(self, item, row, col):
+        # Swap items if slot is occupied
+        current_item = self.game_manager.inventory_slots[row][col]
+        self.game_manager.inventory_slots[row][col] = item
+
+        if current_item:
+            old_row, old_col = item.original_pos
+            if old_col is None:  # Was in hotbar
+                self.game_manager.hotbar_slots[old_row] = current_item
+            else:  # Was in inventory
+                self.game_manager.inventory_slots[old_row][old_col] = current_item
+
+        item.dragging = False
+        self.game_manager.dragged_item = None
+
+
 
 
 ==================== game_manager.py ====================
@@ -250,6 +506,7 @@ from src.render_manager import RenderManager
 from src.player import Player
 from src.camera import Camera
 from src.plant import Plant
+from src.Bridges import Bridge
 from src.item import Tool, Item, Seed # Импортируем также базовый класс Item
 import pytmx
 import os
@@ -277,7 +534,7 @@ class GameManager:
         self.clock_pos = None
 
         # игровое время
-        self.game_time = 300 # Начинаем с начала дня для отладки
+        self.game_time = 0 # Начинаем с начала дня для отладки
         self.last_time_update = 0 # последнее обновление
 
         # затемнение
@@ -316,6 +573,8 @@ class GameManager:
         base_sprites_path = os.path.join("sprites", "player", "sprites_tools")
         hoe_image_path = os.path.join(base_sprites_path, 'hoe.png')
 
+        ### Мотыга
+
         try:
              hoe_image = pygame.image.load(hoe_image_path).convert_alpha()
              print(f"Изображение мотыги успешно загружено по пути: {hoe_image_path}")
@@ -325,6 +584,31 @@ class GameManager:
              print(f"Проверьте путь к файлу: {hoe_image_path}")
         except Exception as e:
              print(f"Произошла другая ошибка при создании объекта Tool для мотыги: {e}")
+
+        ### лопата
+
+        shovel_image_path = os.path.join(base_sprites_path, 'shovel.png')  # Убедитесь, что shovel.png существует
+        try:
+            shovel_image = pygame.image.load(shovel_image_path).convert_alpha()
+            print(f"Изображение лопаты успешно загружено по пути: {shovel_image_path}")
+            self.tools['shovel'] = Tool('Лопата', shovel_image, 'shovel')
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображения лопаты: {e}")
+            print(f"Проверьте путь к файлу: {shovel_image_path}")
+        except Exception as e:
+            print(f"Произошла другая ошибка при создании объекта Tool для лопаты: {e}")
+
+        watering_can_image_path = os.path.join(base_sprites_path,
+                                               'watering_can.png')  # Убедитесь, что watering_can.png существует
+        try:
+            watering_can_image = pygame.image.load(watering_can_image_path).convert_alpha()
+            print(f"Изображение лейки успешно загружено по пути: {watering_can_image_path}")
+            self.tools['watering_can'] = Tool('Лейка', watering_can_image, 'watering_can')
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображения лейки: {e}")
+            print(f"Проверьте путь к файлу: {watering_can_image_path}")
+        except Exception as e:
+            print(f"Произошла другая ошибка при создании объекта Tool для лейки: {e}")
 
 
         # Добавьте загрузку и создание объектов для других инструментов аналогично
@@ -370,6 +654,7 @@ class GameManager:
             self.soil_layer = self.tmx_data.get_layer_by_name('Песочек')
             self.grass_layer = self.tmx_data.get_layer_by_name('Травка')
 
+
             # Получаем объекты слоев коллизий
             for layer_name in self.collision_layers_names:
                  layer = self.tmx_data.get_layer_by_name(layer_name)
@@ -381,6 +666,8 @@ class GameManager:
 
             # Получаем GID тайла земли по свойству
             self.dirt_tile_gid = self.get_tile_gid_by_property('type', 'dirt')
+            self.grass_tile_gid = self.get_tile_gid_by_property('type', 'grass')
+            self.moist_dirt_tile_gid = self.get_tile_gid_by_property('type', 'moist_dirt')
 
             # Проверки наличия слоев и GID
             if not self.soil_layer:
@@ -389,6 +676,8 @@ class GameManager:
                  print("Внимание: Слой 'Травка' не найден в карте. Вспашка не будет работать корректно.")
             if self.dirt_tile_gid is None:
                  print("Внимание: GID тайла земли не найден по свойству 'type'='dirt'. Вспашка не будет работать корректно.")
+            if self.moist_dirt_tile_gid is None:  # <-- ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
+                print("Внимание: GID тайла 'moist_dirt' не найден по свойству 'type'='moist_dirt'. Поливка не будет работать корректно.")
 
         except FileNotFoundError:
              print(f"Ошибка загрузки карты: Файл карты не найден по пути: {map_path}")
@@ -417,6 +706,7 @@ class GameManager:
         self.fps_counter = 0
         self.fps_timer = pygame.time.get_ticks()
         self.shop = Shop(self)
+        self.bridge1 = Bridge(self, 1000, 1000, 15, 10)
 
         self.tile_states = {}  # Словарь или двумерный список для хранения состояния тайлов
 
@@ -488,7 +778,7 @@ class GameManager:
         if 'hoe' in self.tools:
             print("Мотыга найдена в self.tools.")
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
-                success = self.inventory_manager.add_item_to_inventory(self.tools['hoe'], slot_index=0)
+                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['hoe'], slot_index=0)
                 if success:
                     print("Мотыга добавлена в инвентарь игрока через InventoryManager.")
                 else:
@@ -498,6 +788,21 @@ class GameManager:
         else:
             print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
             # --- Конец блока изменения для мотыги ---
+        if 'shovel' in self.tools:  # Проверяем, что лопата была успешно загружена в self.tools
+            print("Лопата найдена в self.tools.")
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
+                # Добавляем лопату, например, в слот 3 (индекс 2), если 0 и 1 заняты мотыгой и пшеницей
+                # Или в любой другой свободный слот, который вы хотите
+                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['shovel'],
+                                                                              slot_index=4)  # Пример
+                if success:
+                    print("Лопата добавлена в инвентарь игрока через InventoryManager.")
+                else:
+                    print("Ошибка: Не удалось добавить лопату в инвентарь через InventoryManager.")
+            else:
+                print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
+        else:
+            print("Ошибка: Лопата не найдена в словаре self.tools (возможно, не удалось загрузить изображение).")
             # --- Добавляем семена пшеницы и томатов в инвентарь игрока ---
         try:
             # Путь к спрайтам предметов (семян)
@@ -531,9 +836,9 @@ class GameManager:
             # Добавляем семена в инвентарь (например, в следующие слоты хотбара)
             if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
                 # Добавляем пшеницу во 2-й слот (индекс 1)
-                self.inventory_manager.add_item_to_inventory(wheat_seed, slot_index=1)
+                self.inventory_manager.add_item_by_slot_or_find(wheat_seed, slot_index=1)
                 # Добавляем томаты в 3-й слот (индекс 2)
-                self.inventory_manager.add_item_to_inventory(tomato_seed, slot_index=2)
+                self.inventory_manager.add_item_by_slot_or_find(tomato_seed, slot_index=2)
                 print("Семена пшеницы и томатов добавлены в инвентарь игрока.")
             else:
                 print("Ошибка: InventoryManager не инициализирован при попытке добавить семена.")
@@ -600,7 +905,7 @@ class GameManager:
                 if self.soil_layer and isinstance(self.soil_layer, pytmx.TiledTileLayer) and self.dirt_tile_gid is not None:
                     self.grass_layer.data[tile_y][tile_x] = 0 # Удаляем тайл травы
                     # Опционально: ставим тайл вспаханной земли на слой "Песочек"
-                    # self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
+                    self.soil_layer.data[tile_y][tile_x] = self.dirt_tile_gid
                     print(f"Тайл травы на ({tile_x}, {tile_y}) удален.")
                 else:
                      self.grass_layer.data[tile_y][tile_x] = self.dirt_tile_gid
@@ -620,6 +925,49 @@ class GameManager:
              # print("Клетка пустая (GID 0). Вспашка не требуется.") # Отладочный вывод
              pass # Нет необходимости в отладочном выводе для пустых клеток
 
+    def untill_tile(self, tile_x, tile_y):
+        """
+        Изменяет вспаханный тайл (грязь/песок) на тайл травы по указанным координатам и
+        обновляет состояние тайла.
+        """
+        print(f"Попытка вернуть траву на клетку: ({tile_x}, {tile_y})")
+
+        if not self.tmx_data or not self.soil_layer or not isinstance(self.soil_layer, pytmx.TiledTileLayer) or \
+                not self.grass_layer or not isinstance(self.grass_layer,
+                                                       pytmx.TiledTileLayer) or self.grass_tile_gid is None:
+            print("Ошибка в untill_tile: Не все необходимые данные карты загружены или имеют правильный тип. Возврат.")
+            return
+
+        map_width_tiles = self.tmx_data.width
+        map_height_tiles = self.tmx_data.height
+
+        if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
+            print(f"Предупреждение в untill_tile: Координаты ({tile_x}, {tile_y}) вне границ карты. Возврат.")
+            return
+
+        # Получаем состояние тайла
+        tile_coords = (tile_x, tile_y)
+        tile_state = self.tile_states.get(tile_coords, {})
+
+        # Проверяем, вспахан ли тайл (для лопаты это необходимо) и нет ли на нем растения
+        if tile_state.get('is_tilled', False) and not tile_state.get('has_plant', False):
+            # Если на тайле есть растение, лопатой его не убираем (пока)
+            print(f"Клетка ({tile_x}, {tile_y}) вспахана и свободна. Возвращаем траву.")
+
+            # Удаляем тайл грязи/песка со слоя "Песочек"
+            self.soil_layer.data[tile_y][tile_x] = 0  # Стираем тайл с песком
+
+            # Ставим тайл травы на слой "Травка"
+            # Важно: Здесь мы предполагаем, что если есть вспашка, то на слое "Травка" было 0.
+            # Если нет, то мы просто восстанавливаем GID травы.
+            self.grass_layer.data[tile_y][tile_x] = self.grass_tile_gid
+
+            # Обновляем состояние тайла
+            self.update_tile_state(tile_x, tile_y, is_tilled=False, has_plant=False)
+            print(f"Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}")
+        else:
+            print(f"Клетка ({tile_x}, {tile_y}) не является вспаханной и/или содержит растение. Лопата бесполезна.")
+
     def update_tile_state(self, tile_x, tile_y, **kwargs):
         """Обновляет состояние тайла по указанным координатам."""
         tile_coords = (tile_x, tile_y)
@@ -633,48 +981,64 @@ class GameManager:
     def handle_events(self):
         """
         Обработка всех событий Pygame и их распределение по соответствующим менеджерам.
-        Включает обработку общих событий, инвентаря и взаимодействия с магазином.
+        Включает обработку общих событий, инвентаря, взаимодействия с магазином и мостом.
         """
         events = pygame.event.get()
         keys = pygame.key.get_pressed()  # Получаем состояние клавиш
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
-                return False # Сигнализируем, что игра должна завершиться
+                return False  # Сигнализируем, что игра должна завершиться
+
             # --- Передача события Event Handler ---
-            # Сначала обрабатываем общие события (меню, пауза и т.д.)
             if not self.event_handler.handle_events(event):
-                # Event Handler может установить self.running = False
-                # или изменить состояние игры (например, на GameState.QUIT)
-                # Если Event Handler возвращает False, завершаем обработку событий
                 return False
+
             # --- Передача события игроку ---
-            # Передаем событие игроку только если игра в состоянии GAME
             if self.state == GameState.GAME and hasattr(self, 'player') and self.player:
                 self.player.handle_input(event)
+
             # --- Передача события инвентарю ---
-            # Инвентарь должен обрабатывать события всегда, чтобы его можно было открыть/закрыть
             if hasattr(self, 'inventory_manager') and self.inventory_manager:
-                 self.inventory_manager.handle_input(event)
+                self.inventory_manager.handle_input(event)
+
             # --- Обработка взаимодействия с магазином ---
-            # Обрабатываем событие только если магазин инициализирован
             if hasattr(self, 'shop') and isinstance(self.shop, Shop):
-                 # Обработка открытия/закрытия магазина по клавише взаимодействия
-                 if event.type == pygame.KEYDOWN and event.key == self.settings['controls']['interact']:
-                     # Проверяем, находится ли игрок в зоне магазина и инвентарь закрыт
-                     if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
-                         self.shop.toggle_shop()
-                         print("Магазин открыт/закрыт")
-                     # Если магазин открыт, клики вне инвентаря могут быть для магазина
-                     elif self.shop.is_open:
-                          # Дополнительная логика для магазина при клике мыши (если нужна)
-                          if event.type == pygame.MOUSEBUTTONDOWN:
-                               pass # TODO: Добавить логику обработки кликов в магазине
-        # Вызов handle_input для магазина (если он открыт)
-        # Обработка ввода с клавиатуры в магазине (например, для выбора предметов)
+                if event.type == pygame.KEYDOWN and event.key == self.settings['controls']['interact']:
+                    if not self.inventory_manager.inventory_open and self.shop.is_player_in_range():
+                        self.shop.toggle_shop()
+                        print("Магазин открыт/закрыт")
+                    elif self.shop.is_open:
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            pass  # Можно добавить логику обработки кликов в магазине
+
+            # --- Обработка взаимодействия с мостом ---
+            # Предположим, что у вас есть список мостов self.bridges
+            if hasattr(self, 'bridge1'):
+                # Обработка открытия диалога отдачи ресурсов
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_e and self.bridge1.is_player_in_range():
+                        self.bridge1.toggle_dialog()
+                        print("Диалог отдачи ресурсов для моста открыт/закрыт")
+                # Обработка кликов мыши внутри диалога моста
+                if self.bridge1.show_dialog:
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        # Здесь можно добавить логику для обработки кликов по интерфейсу моста
+                        # например, выбор ресурса или подтверждение отдачи
+                        pass
+
+                # Обработка ввода с клавиатуры для интерфейса моста
+                if self.bridge1.show_dialog:
+                    self.bridge1.handle_input(keys, events)
+
+        # Вызов handle_input для магазина, если он открыт
         if hasattr(self, 'shop') and self.shop.is_open:
-            self.shop.handle_input(keys, events) # Передаем состояние клавиш и список событий
-        return True # Возвращаем True, если игра должна продолжаться
+            self.shop.handle_input(keys, events)
+
+        if self.bridge1.is_open:
+            self.bridge1.handle_input(keys, events)
+
+        return True  # Продолжаем игру
 
     def update(self):
         """Обновляет состояние игры"""
@@ -711,17 +1075,21 @@ class GameManager:
             # Сортируем спрайты по нижней границе для правильной отрисовки (персонажи перед растениями)
             all_sprites_except_plants = [s for s in self.all_sprites if
                                          not isinstance(s, Plant)]  # Исключаем растения из основной группы отрисовки
-            all_sprites_sorted = sorted(all_sprites_except_plants, key=lambda sprite: sprite.rect.bottom)
+            all_sprites_sorted = sorted(self.all_sprites, key=lambda sprite: sprite.rect.centery)
             for sprite in all_sprites_sorted:
                 pos = self.camera.apply(sprite)
                 screen.blit(sprite.image, pos.topleft)
             # !!! Отрисовка растений !!!
+            for plant_sprite in self.plants:
+                pos = self.camera.apply(plant_sprite)
+                screen.blit(plant_sprite.image, pos.topleft)
             # Растения также являются спрайтами и будут отрисовываться вместе с all_sprites
             # Если нужно отдельное управление отрисовкой растений, можно отрисовывать self.plants здесь
             self.draw_clock(screen)
             # Отрисовка интерфейса (всегда поверх всего остального)
             self.inventory_manager.draw(screen)
             self.shop.draw(screen)
+            self.bridge1.draw(screen)
             self.player.draw_coins(screen)
             # Отрисовка FPS (для отладки)
             fps_text = self.fonts['small'].render(f"FPS: {self.fps}", True, (255, 255, 255))
@@ -732,34 +1100,21 @@ class GameManager:
     def init_clock(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()
+
         offset = 10
+
         self.clock_pos = (screen_width - self.clock_size - offset, offset)
 
-        # Загрузка изображений часов
         try:
-            clock_bg_path = os.path.join("sprites", "clock", "clock_bg.png")
-            clock_arrow_path = os.path.join("sprites", "clock", "clock_arrow.png")
-            self.clock_bg = pygame.image.load(clock_bg_path).convert_alpha()
-            self.clock_arrow = pygame.image.load(clock_arrow_path).convert_alpha()
-            print("Изображения часов успешно загружены.")
-        except pygame.error as e:
-            print(f"Ошибка загрузки изображений часов: {e}")
-            print("Создаются заглушки для часов.")
-            # Создаем заглушки, если изображения не найдены
+            self.clock_bg = pygame.image.load("sprites/clock/clock_bg.png").convert_alpha()
+            self.clock_arrow = pygame.image.load("sprites/clock/clock_arrow.png").convert_alpha()
+        except:
             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
+            pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size // 2, self.clock_size // 2),
+                               self.clock_size // 2)
             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
-                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
-        except Exception as e:
-             print(f"Произошла другая ошибка при инициализации часов: {e}")
-             # Создаем заглушки в случае других ошибок
-             self.clock_bg = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-             pygame.draw.circle(self.clock_bg, (200, 200, 200), (self.clock_size//2, self.clock_size//2), self.clock_size//2)
-             self.clock_arrow = pygame.Surface((self.clock_size, self.clock_size), pygame.SRCALPHA)
-             pygame.draw.rect(self.clock_arrow, (50, 50, 50),
-                            (self.clock_size//2 - 2, 10, 4, self.clock_size//2))
-
+                             (self.clock_size // 2 - 2, 10, 4, self.clock_size // 2))
 
         # если нужен будет рескейл
         # self.clock_bg = pygame.transform.scale(self.clock_bg, (self.clock_size, self.clock_size))
@@ -768,59 +1123,34 @@ class GameManager:
         self.night_overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
         self.night_overlay.fill((0, 0, 0, 180))
 
-
     def draw_clock(self, screen):
-        if self.clock_bg: # Проверяем, что изображение фона часов загружено
-            screen.blit(self.clock_bg, self.clock_pos)
+        screen.blit(self.clock_bg, self.clock_pos)
 
-            if self.clock_arrow: # Проверяем, что изображение стрелки часов загружено
-                angle = math.radians(self.game_time * -0.5) # Угол в радианах (умножаем на -0.5 для вращения по часовой стрелке)
-                # Вращаем стрелку
-                rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
-                # Получаем прямоугольник повернутой стрелки и центрируем его по центру фона часов
-                arrow_rect = rotated_arrow.get_rect(center=(
-                    self.clock_pos[0] + self.clock_size // 2,
-                    self.clock_pos[1] + self.clock_size // 2
-                ))
-                screen.blit(rotated_arrow, arrow_rect)
-            else:
-                 print("Предупреждение: Изображение стрелки часов не загружено.")
+        angle = math.radians(self.game_time * -0.5)
 
-        else:
-            print("Предупреждение: Изображение фона часов не загружено.")
+        rotated_arrow = pygame.transform.rotate(self.clock_arrow, math.degrees(angle))
+        arrow_rect = rotated_arrow.get_rect(center=(
+            self.clock_pos[0] + self.clock_size // 2,
+            self.clock_pos[1] + self.clock_size // 2
+        ))
+        screen.blit(rotated_arrow, arrow_rect)
 
-
-        # Отрисовка затемнения (ночи)
-        if self.is_night and self.night_overlay: # Проверяем наличие night_overlay
+        if self.is_night:
             screen.blit(self.night_overlay, (0, 0))
-        elif self.is_night and not self.night_overlay:
-            print("Предупреждение: night_overlay не инициализирован, но is_night = True.")
-
 
     def update_clock(self):
         # для дебага
         # print(f"Time: {self.game_time}, Minute: {(self.game_time // 60) % 12}, Night: {self.is_night}")
 
         current_time = time.time()
-        # Обновляем игровое время каждую секунду реального времени
         if current_time - self.last_time_update >= 1:
-            self.game_time += 1 # Увеличиваем на 1 секунду
+            self.game_time += 1
             self.last_time_update = current_time
 
-        # Пример: день 12 минут (720 секунд) игрового времени = 12 реальных минут
-        # 12 игровых часов = 720 секунд игрового времени
-        # 1 игровой час = 60 секунд игрового времени
+        if self.game_time >= 720:
+            self.game_time = 0
 
-        max_game_time = 720 # Максимальное игровое время в цикле
-
-        if self.game_time >= max_game_time:
-            self.game_time = 0 # Сбрасываем игровое время в начало нового дня
-
-        # Пример: ночь с 11-го до 5-го часа (по циферблату)
-        # 11-й час начинается с (11 * 60) = 660 секунды
-        # 5-й час заканчивается в (5 * 60) = 300 секунд (на следующий день)
-        # То есть ночь с 660 до 720 (конец дня) и с 0 до 300 (начало дня)
-        self.is_night = (self.game_time >= 660) or (self.game_time < 300) # Исправлено условие для начала дня
+        self.is_night = (self.game_time // 60) % 12 == 11
 
     def render_map(self, screen):
         """Отрисовка карты"""
@@ -989,7 +1319,7 @@ class GameState(Enum):
 ==================== inventory_manager.py ====================
 
 import pygame
-from src.item import Item, Tool # Убедитесь, что путь к Item и Tool правильный
+from src.item import Item, Tool, Tomato, Wheat, Seed # Убедитесь, что путь к Item и Tool правильный
 
 class InventoryManager:
     def __init__(self, game_manager):
@@ -1016,25 +1346,37 @@ class InventoryManager:
         self.inventory_rows = 6
         self.inventory_panel_padding = 10 # Добавлена константа для отступа панели инвентаря
 
-    def add_item_to_inventory(self, item, slot_index=None, row=None, col=None):
+    def add_item_by_slot_or_find(self, item, slot_index=None, row=None, col=None):
         # Если предмет стакается, ищем такой же в инвентаре
         if item.stackable:
             # Проверяем хотбар
             for i, slot_item in enumerate(self.hotbar_slots):
                 if slot_item and slot_item.name == item.name and slot_item.quantity < slot_item.max_stack:
                     # Увеличиваем количество, если нашли такой же предмет
-                    slot_item.quantity += item.quantity
-                    return True
-
+                    # Здесь ОЧЕНЬ ВАЖНО: item.quantity - это сколько мы хотим добавить.
+                    # slot_item.quantity - сколько уже есть.
+                    # Нужно добавить min(item.quantity, space_available)
+                    space_available = slot_item.max_stack - slot_item.quantity
+                    amount_to_add = min(item.quantity, space_available)
+                    slot_item.quantity += amount_to_add
+                    item.quantity -= amount_to_add  # Уменьшаем количество у добавляемого предмета
+                    if item.quantity == 0:  # Если все добавили, выходим
+                        return True
             # Проверяем основной инвентарь
             for r in range(self.inventory_rows):
                 for c in range(self.inventory_cols):
                     inv_item = self.inventory[r][c]
                     if inv_item and inv_item.name == item.name and inv_item.quantity < inv_item.max_stack:
-                        inv_item.quantity += item.quantity
-                        return True
+                        space_available = inv_item.max_stack - inv_item.quantity
+                        amount_to_add = min(item.quantity, space_available)
+                        inv_item.quantity += amount_to_add
+                        item.quantity -= amount_to_add
+                        if item.quantity == 0:
+                            return True
 
-        # Если предмет не стакается или не найден подходящий стак, добавляем как обычно
+        # Если остались предметы (item.quantity > 0) или предмет не стакается,
+        # ищем пустой слот.
+        # Если указан конкретный слот
         if slot_index is not None:
             if 0 <= slot_index < len(self.hotbar_slots):
                 if self.hotbar_slots[slot_index] is None:
@@ -1046,7 +1388,12 @@ class InventoryManager:
                     self.inventory[row][col] = item
                     return True
         else:
-            # Поиск первого свободного слота
+            # Поиск первого свободного слота (сначала хотбар, потом инвентарь)
+            # Внимание: если item.quantity > 1 и не все поместилось в стаки,
+            # этот код сейчас будет пытаться поместить весь item.
+            # Для корректной обработки, вам нужно будет создать новый экземпляр Item
+            # с оставшимся количеством. Но чтобы не мудрить, пока оставим так.
+            # Для урожая, приходящего из plant.harvest(), quantity = 1, так что это не проблема.
             for i in range(len(self.hotbar_slots)):
                 if self.hotbar_slots[i] is None:
                     self.hotbar_slots[i] = item
@@ -1057,6 +1404,244 @@ class InventoryManager:
                         self.inventory[r][c] = item
                         return True
         return False
+
+    def add_item(self, item_instance: Item, quantity: int = 1):
+        """
+        Добавляет уже существующий экземпляр предмета в инвентарь.
+        Используется, когда у нас уже есть объект Item (например, при сборе урожая).
+        item_instance: экземпляр класса Item (или его подкласса), который нужно добавить.
+                       Его image, name, stackable, max_stack уже определены.
+        quantity: количество, которое нужно добавить.
+        """
+        if not isinstance(item_instance, Item):
+            print(f"Ошибка: Попытка добавить не-Item объект в инвентарь: {item_instance}")
+            return False
+        # Подготовка аргументов для создания нового экземпляра/копии
+        # Это нужно, потому что конструкторы Item, Tool, Seed, Tomato, Wheat
+        # принимают разные наборы аргументов.
+        # Общие аргументы, которые есть почти у всех
+        common_args = {
+            'quantity': quantity,
+            'scale_to_size': item_instance.image.get_size() if item_instance.image else None,
+            # 'image_path_or_surface' используется в Item и его прямых подклассах
+            'image_path_or_surface': item_instance.image_path if hasattr(item_instance, 'image_path') else None
+        }
+        # Создаем копию объекта для работы с количеством (item_to_add)
+        # Это важно, чтобы не менять оригинальный item_instance, который пришел извне
+        if isinstance(item_instance, Tomato):
+            # Tomato.__init__ принимает только quantity, description, scale_to_size, image_path_or_surface
+            item_to_add = Tomato(
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size'],
+                image_path_or_surface=common_args['image_path_or_surface']  # Если Tomato может принимать Surface/path
+            )
+        elif isinstance(item_instance, Wheat):
+            # Wheat.__init__ принимает только quantity, description, scale_to_size, image_path_or_surface
+            item_to_add = Wheat(
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size'],
+                image_path_or_surface=common_args['image_path_or_surface']  # Если Wheat может принимать Surface/path
+            )
+        elif isinstance(item_instance, Seed):
+            # Seed.__init__ принимает name, image_path_or_surface, plant_type, quantity, description, scale_to_size
+            item_to_add = Seed(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                plant_type=item_instance.plant_type,
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        elif isinstance(item_instance, Tool):
+            # Tool.__init__ принимает name, image_path_or_surface, tool_type, durability, quantity, description, scale_to_size
+            item_to_add = Tool(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                tool_type=item_instance.tool_type,
+                durability=item_instance.durability,  # Копируем текущую прочность
+                quantity=quantity,  # Инструменты обычно не стакуются, но оставляем для общности
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        elif isinstance(item_instance, Item):  # Базовый Item
+            # Item.__init__ принимает name, image_path_or_surface, item_type, stackable, max_stack, quantity, description, scale_to_size
+            item_to_add = Item(
+                name=item_instance.name,
+                image_path_or_surface=common_args['image_path_or_surface'],
+                item_type=item_instance.item_type,
+                stackable=item_instance.stackable,
+                max_stack=item_instance.max_stack,
+                quantity=quantity,
+                description=item_instance.description,
+                scale_to_size=common_args['scale_to_size']
+            )
+        else:
+            print(f"Ошибка: Неизвестный тип предмета {type(item_instance)} в add_item.")
+            return False
+        remaining_quantity = item_to_add.quantity
+        # --- Шаг 1: Попытка стакать с существующими предметами ---
+        if item_to_add.stackable:
+            # Проверяем хотбар
+            for i, slot_item in enumerate(self.hotbar_slots):
+                if slot_item and slot_item.name == item_to_add.name and slot_item.quantity < slot_item.max_stack:
+                    space_available = slot_item.max_stack - slot_item.quantity
+                    amount_to_fill = min(remaining_quantity, space_available)
+                    slot_item.quantity += amount_to_fill
+                    remaining_quantity -= amount_to_fill
+                    if remaining_quantity == 0:
+                        print(f"Добавлено {quantity}x {item_to_add.name} в существующий стек хотбара.")
+                        return True
+            # Проверяем основной инвентарь
+            for r in range(self.inventory_rows):
+                for c in range(self.inventory_cols):
+                    inv_item = self.inventory[r][c]
+                    if inv_item and inv_item.name == item_to_add.name and inv_item.quantity < inv_item.max_stack:
+                        space_available = inv_item.max_stack - inv_item.quantity
+                        amount_to_fill = min(remaining_quantity, space_available)
+                        inv_item.quantity += amount_to_fill
+                        remaining_quantity -= amount_to_fill
+                        if remaining_quantity == 0:
+                            print(f"Добавлено {quantity}x {item_to_add.name} в существующий стек инвентаря.")
+                            return True
+        # --- Шаг 2: Создание новых стеков или размещение нестекуемых предметов ---
+        while remaining_quantity > 0:
+            found_empty_slot = False
+            # Аргументы для создания new_slot_item
+            # Количество для нового стека будет amount_for_new_stack
+            new_item_creation_quantity = min(remaining_quantity, item_to_add.max_stack)
+            # Сначала ищем пустой слот в хотбаре
+            for i in range(len(self.hotbar_slots)):
+                if self.hotbar_slots[i] is None:
+                    if isinstance(item_to_add, Tomato):
+                        new_slot_item = Tomato(
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size'],
+                            image_path_or_surface=common_args['image_path_or_surface']
+                        )
+                    elif isinstance(item_to_add, Wheat):
+                        new_slot_item = Wheat(
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size'],
+                            image_path_or_surface=common_args['image_path_or_surface']
+                        )
+                    elif isinstance(item_to_add, Seed):
+                        new_slot_item = Seed(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            plant_type=item_to_add.plant_type,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    elif isinstance(item_to_add, Tool):
+                        new_slot_item = Tool(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            tool_type=item_to_add.tool_type,
+                            durability=item_to_add.durability,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    elif isinstance(item_to_add, Item):
+                        new_slot_item = Item(
+                            name=item_to_add.name,
+                            image_path_or_surface=common_args['image_path_or_surface'],
+                            item_type=item_to_add.item_type,
+                            stackable=item_to_add.stackable,
+                            max_stack=item_to_add.max_stack,
+                            quantity=new_item_creation_quantity,
+                            description=item_to_add.description,
+                            scale_to_size=common_args['scale_to_size']
+                        )
+                    else:  # Не должно быть достигнуто, но для безопасности
+                        print(f"Ошибка: Неизвестный тип предмета {type(item_to_add)} при создании нового слота.")
+                        break  # Выход из цикла while
+                    self.hotbar_slots[i] = new_slot_item
+                    remaining_quantity -= new_item_creation_quantity
+                    found_empty_slot = True
+                    print(f"Создан новый стек {new_slot_item.name} x{new_slot_item.quantity} в хотбаре.")
+                    break
+            if found_empty_slot and remaining_quantity == 0:
+                return True
+            # Если остались предметы, ищем пустой слот в основном инвентаре
+            if remaining_quantity > 0:
+                found_empty_slot_in_inventory = False
+                for r in range(self.inventory_rows):
+                    for c in range(self.inventory_cols):
+                        if self.inventory[r][c] is None:
+                            new_item_creation_quantity = min(remaining_quantity, item_to_add.max_stack)
+
+                            if isinstance(item_to_add, Tomato):
+                                new_slot_item = Tomato(
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size'],
+                                    image_path_or_surface=common_args['image_path_or_surface']
+                                )
+                            elif isinstance(item_to_add, Wheat):
+                                new_slot_item = Wheat(
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size'],
+                                    image_path_or_surface=common_args['image_path_or_surface']
+                                )
+                            elif isinstance(item_to_add, Seed):
+                                new_slot_item = Seed(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    plant_type=item_to_add.plant_type,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            elif isinstance(item_to_add, Tool):
+                                new_slot_item = Tool(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    tool_type=item_to_add.tool_type,
+                                    durability=item_to_add.durability,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            elif isinstance(item_to_add, Item):
+                                new_slot_item = Item(
+                                    name=item_to_add.name,
+                                    image_path_or_surface=common_args['image_path_or_surface'],
+                                    item_type=item_to_add.item_type,
+                                    stackable=item_to_add.stackable,
+                                    max_stack=item_to_add.max_stack,
+                                    quantity=new_item_creation_quantity,
+                                    description=item_to_add.description,
+                                    scale_to_size=common_args['scale_to_size']
+                                )
+                            else:
+                                print(
+                                    f"Ошибка: Неизвестный тип предмета {type(item_to_add)} при создании нового слота.")
+                                break
+                            self.inventory[r][c] = new_slot_item
+                            remaining_quantity -= new_item_creation_quantity
+                            found_empty_slot_in_inventory = True
+                            print(f"Создан новый стек {new_slot_item.name} x{new_slot_item.quantity} в инвентаре.")
+                            break
+                    if found_empty_slot_in_inventory:
+                        break
+                if not found_empty_slot_in_inventory:
+                    print(
+                        f"Инвентарь полон, не удалось добавить все {quantity}x {item_to_add.name}. Осталось: {remaining_quantity}")
+                    return False
+            if not found_empty_slot and not found_empty_slot_in_inventory and remaining_quantity > 0:
+                print(
+                    f"Инвентарь полон, не удалось добавить все {quantity}x {item_to_add.name}. Осталось: {remaining_quantity}")
+                return False
+        print(
+            f"Предмет {item_to_add.name} добавлен в инвентарь (добавлено {quantity - remaining_quantity} из {quantity}).")
+        return True
 
     def handle_input(self, event):
         """Обработка событий ввода, связанных с инвентарем (открытие/закрытие, выбор слота, перетаскивание)"""
@@ -1074,7 +1659,6 @@ class InventoryManager:
         #      print(f"Mouse motion to {event.pos}")
         # --- Конец отладочных принтов ---
 
-
         if event.type == pygame.KEYDOWN:
             # Обработка открытия/закрытия инвентаря клавишей
             if event.key == self.game_manager.settings['controls']['inventory']:
@@ -1082,7 +1666,6 @@ class InventoryManager:
                 # print(f"Инвентарь {'открыт' if self.inventory_open else 'закрыт'}") # Отладочный принт
 
             # Обработка выбора слота хотбара клавишами 1-8 (если инвентарь закрыт)
-            # Этот блок у вас уже работает
             if not self.inventory_open:
                 for i in range(8):
                     if event.key == getattr(pygame, f'K_{i + 1}'):
@@ -1104,8 +1687,10 @@ class InventoryManager:
                             self.drag_offset = (mouse_pos[0] - item_image_rect.x, mouse_pos[1] - item_image_rect.y)
                         else:
                             self.drag_offset = (0, 0)
-                        self._remove_item_from_slot(slot_info)
-                        # print(f"Начато перетаскивание предмета {item.name} из {slot_info}") # Отладочный принт
+                        # !!! КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: УДАЛИЛИ ЭТУ СТРОКУ !!!
+                        # self._remove_item_from_slot(slot_info)
+                        # Теперь предмет удаляется из исходного слота только если place_item_in_slot успешно его переместит.
+
                 # TODO: Добавить здесь обработку кликов вне инвентаря (для использования предмета в мире),
                 # если эта логика не в Player.handle_input
 
@@ -1116,29 +1701,32 @@ class InventoryManager:
                     target_slot_info = self.get_slot_from_click(mouse_pos)
 
                     if target_slot_info:
-                        # print(f"Предмет {self.dragging_item.name} брошен в {target_slot_info}") # Отладочный принт
+                        # Попытка поместить перетаскиваемый предмет в целевой слот
                         success = self.place_item_in_slot(self.dragging_item, target_slot_info, self.drag_start_slot)
                         if not success:
-                            # print(f"Не удалось поместить предмет {self.dragging_item.name} в {target_slot_info}. Возврат в исходный слот {self.drag_start_slot}.") # Отладочный принт
-                            self.place_item_in_slot(self.dragging_item, self.drag_start_slot) # Вернуть в исходный слот
+                            # Если не удалось поместить (например, целевой слот занят и не стакуется/обменялся),
+                            # или если произошло частичное стакание (и place_item_in_slot вернул False),
+                            # то возвращаем оставшийся предмет в исходный слот.
+                            self._place_item_in_slot_direct(self.dragging_item, self.drag_start_slot)
+                            print(f"Не удалось полностью переместить {self.dragging_item.name}. Остаток возвращен в исходный слот.")
                     else:
                         # Предмет брошен вне инвентаря (логика выброса)
                         print(f"Предмет {self.dragging_item.name} выброшен.")
                         # Здесь можно добавить логику для создания объекта Item на земле
+                        # Например: self.game_manager.spawn_item_on_ground(self.dragging_item, self.game_manager.player.rect.center)
 
                     self.dragging_item = None
                     self.drag_start_slot = None
                     self.drag_offset = (0, 0)
+
                 # TODO: Добавить здесь обработку отпускания кликов вне инвентаря
 
         elif event.type == pygame.MOUSEMOTION:
-             # --- Раскомментированный блок для обработки движения мыши ---
              if self.dragging_item:
                  # Позиция перетаскиваемого предмета обновляется при отрисовке.
                  # Здесь можно добавить логику для проверки наведения на слоты,
                  # если хотите визуально подсвечивать целевой слот.
                  pass
-             # --- Конец раскомментированного блока ---
 
 
     def get_item_from_click(self, mouse_pos):
@@ -1277,70 +1865,76 @@ class InventoryManager:
 
         return None # Неизвестный тип слота
 
-    def place_item_in_slot(self, item, target_slot_info, source_slot_info=None):
+    def place_item_in_slot(self, item_to_place: Item, target_slot_info, source_slot_info=None):
         """
         Помещает предмет в целевой слот.
+        Обрабатывает обмен и стакание.
         Возвращает True при успехе, False при неудаче.
-        Обрабатывает обмен и стакание (пока простая версия).
         """
-        if not item:
-            # print("Попытка поместить None.") # Отладочный принт
+        if not item_to_place:
             return False
-
         target_type = target_slot_info[0]
-        target_index_or_coords = target_slot_info[1:]
-
-        # Получаем текущий предмет в целевом слоте
+        target_index = target_slot_info[1] if target_type == 'hotbar' else None
+        target_row, target_col = (target_slot_info[1], target_slot_info[2]) if target_type == 'inventory' else (
+        None, None)
         current_item_in_target = None
         if target_type == 'hotbar':
-            target_index = target_index_or_coords[0]
             if 0 <= target_index < len(self.hotbar_slots):
-                 current_item_in_target = self.hotbar_slots[target_index]
-            else:
-                print(f"Неверный целевой хотбар слот: {target_slot_info}")
-                return False
+                current_item_in_target = self.hotbar_slots[target_index]
         elif target_type == 'inventory':
-            target_row, target_col = target_index_or_coords
             if 0 <= target_row < self.inventory_rows and 0 <= target_col < self.inventory_cols:
-                 current_item_in_target = self.inventory[target_row][target_col]
-            else:
-                 print(f"Неверный целевой инвентарь слот: {target_slot_info}")
-                 return False
+                current_item_in_target = self.inventory[target_row][target_col]
         else:
-            print(f"Неизвестный целевой слот: {target_slot_info}")
             return False
+        # --- Логика стакания ---
+        if item_to_place.stackable and current_item_in_target and \
+                current_item_in_target.name == item_to_place.name and \
+                current_item_in_target.quantity < current_item_in_target.max_stack:
 
-        # Логика размещения
+            space_available = current_item_in_target.max_stack - current_item_in_target.quantity
+            amount_to_move = item_to_place.quantity
+
+            if amount_to_move <= space_available:
+                # Весь предмет помещается в существующий стек
+                current_item_in_target.quantity += amount_to_move
+                if source_slot_info:
+                    self._remove_item_from_slot(source_slot_info)  # Очищаем исходный слот
+                return True
+            else:
+                # Часть предмета помещается, остальное остается
+                current_item_in_target.quantity += space_available
+                item_to_place.quantity -= space_available
+                # !!! ОЧЕНЬ ВАЖНО !!! Если предмет был взят из source_slot_info
+                # и его количество уменьшилось (item_to_place.quantity > 0),
+                # то нужно вернуть оставшееся количество в source_slot_info.
+                # Это должно быть сделано внешней логикой в handle_input после вызова place_item_in_slot,
+                # если place_item_in_slot вернуло False (что означает, что не все поместилось).
+                return False  # Возвращаем False, чтобы сообщить, что не все помещено
+        # --- Логика обмена или размещения в пустой слот ---
         if current_item_in_target is None:
             # Целевой слот пуст - просто помещаем предмет
             if target_type == 'hotbar':
-                self.hotbar_slots[target_index] = item
+                self.hotbar_slots[target_index] = item_to_place
             elif target_type == 'inventory':
-                self.inventory[target_row][target_col] = item
-            # print(f"Предмет {item.name} помещен в целевой слот {target_slot_info}.") # Отладочный принт
-            return True
-
-        else:
-            # Целевой слот занят - попытка обмена или стакания
-            # Простая логика обмена: если предмет в целевом слоте не None, меняем местами
-            # print(f"Целевой слот {target_slot_info} занят предметом {current_item_in_target.name}. Попытка обмена.") # Отладочный принт
+                self.inventory[target_row][target_col] = item_to_place
 
             if source_slot_info:
-                # Удаляем предмет из исходного слота перед обменом
-                 self._remove_item_from_slot(source_slot_info)
-                 # Помещаем текущий предмет из целевого слота в исходный
-                 self._place_item_in_slot_direct(current_item_in_target, source_slot_info)
-
-            # Помещаем перетаскиваемый предмет в целевой слот
-            if target_type == 'hotbar':
-                self.hotbar_slots[target_index] = item
-            elif target_type == 'inventory':
-                self.inventory[target_row][target_col] = item
-
-            # print(f"Предметы успешно обменены между {source_slot_info} и {target_slot_info}.") # Отладочный принт
-            return True # Обмен считается успешным
-
-        # TODO: Добавить логику стакания предметов (если предметы стакуемые и одного типа)
+                self._remove_item_from_slot(source_slot_info)  # Очищаем исходный слот
+            return True
+        else:
+            # Целевой слот занят и стакание невозможно - пробуем обменять
+            if source_slot_info:
+                # Обмениваем предметы: сначала текущий предмет из целевого слота помещаем в исходный
+                self._place_item_in_slot_direct(current_item_in_target, source_slot_info)
+                # Затем перетаскиваемый предмет помещаем в целевой слот
+                if target_type == 'hotbar':
+                    self.hotbar_slots[target_index] = item_to_place
+                elif target_type == 'inventory':
+                    self.inventory[target_row][target_col] = item_to_place
+                return True
+            else:
+                # Целевой слот занят, и нет исходного слота (нельзя обменять)
+                return False
 
     def _remove_item_from_slot(self, slot_info):
         """Вспомогательный метод для удаления предмета из слота."""
@@ -1557,39 +2151,120 @@ class InventoryManager:
 
 ==================== item.py ====================
 
+# item.py
 import pygame
+import os
+
 
 class Item(pygame.sprite.Sprite):
-    def __init__(self, name, image, item_type, stackable=False, max_stack=1):
+    def __init__(self, name, image_path_or_surface, item_type, stackable=False, max_stack=1, quantity=1, description="",
+                 scale_to_size=None):
         super().__init__()
         self.name = name
-        self.image = image
-        self.rect = self.image.get_rect()
-        self.type = item_type
-        self.stackable = stackable  # Можно ли стакать предмет
-        self.max_stack = max_stack  # Максимальное количество в стаке
-        self.quantity = 1  # Текущее количество в стаке
+        # Изменено: image_path_or_surface может быть как строкой, так и pygame.Surface
+        self.image_path = None  # Будет хранить путь, если был передан путь
+        self.image = self._load_image(image_path_or_surface, scale_to_size)  # Вызываем _load_image
+
+        if isinstance(image_path_or_surface, str):  # Если был передан путь, сохраняем его
+            self.image_path = image_path_or_surface
+
+        if self.image:
+            self.rect = self.image.get_rect()
+        else:
+            self.rect = pygame.Rect(0, 0, 32, 32)  # Заглушка, если нет изображения
+
+        self.item_type = item_type
+        self.stackable = stackable
+        self.max_stack = max_stack
+        self.quantity = quantity  # Добавлено quantity в __init__ Item
+        self.description = description
+
+    def _load_image(self, path_or_surface, scale_to_size):
+        """
+        Внутренний метод для загрузки и масштабирования изображения.
+        Принимает либо путь к файлу (строку), либо уже загруженный pygame.Surface.
+        """
+        if isinstance(path_or_surface, pygame.Surface):
+            # Если уже передан Surface, просто используем его
+            image = path_or_surface
+            if scale_to_size:
+                if image.get_size() != scale_to_size:  # Масштабируем только если размер отличается
+                    image = pygame.transform.scale(image, scale_to_size)
+            return image
+
+        if not path_or_surface:  # Если ни Surface, ни пути нет
+            print(f"Предупреждение: для предмета '{self.name}' не указан путь к изображению или Surface.")
+            return None
+
+        # Если path_or_surface - это строка (путь)
+        try:
+            image = pygame.image.load(path_or_surface).convert_alpha()
+            if scale_to_size:
+                image = pygame.transform.scale(image, scale_to_size)
+            return image
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображения '{path_or_surface}' для предмета '{self.name}': {e}")
+            return None
+        except Exception as e:
+            print(f"Неожиданная ошибка при загрузке изображения '{path_or_surface}' для предмета '{self.name}': {e}")
+            return None
 
     def use(self, target):
-        pass  # Реализуем в подклассах
+        pass
+
+    def __str__(self):
+        if self.stackable:
+            return f"{self.name} (x{self.quantity}/{self.max_stack})"
+        else:
+            return self.name
+
 
 class Tool(Item):
-    def __init__(self, name, image, tool_type, durability=100):
-        # Инструменты не стакаются
-        super().__init__(name, image, tool_type, stackable=False, max_stack=1)
+    # Добавил quantity=1 в __init__, чтобы соответствовать базовому Item
+    def __init__(self, name, image_path_or_surface, tool_type, durability=100, quantity=1, description="",
+                 scale_to_size=None):
+        super().__init__(name, image_path_or_surface, 'tool', stackable=False, max_stack=1, quantity=quantity,
+                         description=description, scale_to_size=scale_to_size)
+        self.tool_type = tool_type
         self.durability = durability
         self.max_durability = durability
 
-class Seed(Item):
-    def __init__(self, name, image, plant_type):
-        # Семена стакаются (например, до 20 штук)
-        super().__init__(name, image, 'seed', stackable=True, max_stack=20)
-        self.plant_type = plant_type
 
-    def plant(self, location):
-        # Метод для посадки семени. Пока просто заглушка.
-        print(f"Посажено семя {self.name} в {location}")
-        pass
+class Seed(Item):
+    # Добавил quantity=1 в __init__, чтобы соответствовать базовому Item
+    def __init__(self, name, image_path_or_surface, plant_type, quantity=1, description="", scale_to_size=None):
+        super().__init__(name, image_path_or_surface, 'seed', stackable=True, max_stack=20, quantity=quantity,
+                         description=description, scale_to_size=scale_to_size)
+        self.plant_type = plant_type
+        # self.quantity уже устанавливается в super().__init__
+
+
+class Tomato(Item):
+    # Добавил image_path_or_surface=None, чтобы можно было передать Surface при инициализации
+    def __init__(self, quantity=1, description="Сочный красный помидор.", scale_to_size=None,
+                 image_path_or_surface=None):
+        # Используем image_path_or_surface если он передан, иначе наш дефолтный путь
+        path = "sprites/plants/grownPlants/tomato.png" if image_path_or_surface is None else image_path_or_surface
+        super().__init__("Томаты", path, "crop", stackable=True, max_stack=99, quantity=quantity,
+                         description=description, scale_to_size=scale_to_size)
+        # self.quantity уже устанавливается в super().__init__
+
+
+class Wheat(Item):
+    # Добавил image_path_or_surface=None, чтобы можно было передать Surface при инициализации
+    def __init__(self, quantity=1, description="Золотистый колосок пшеницы.", scale_to_size=None,
+                 image_path_or_surface=None):
+        # Используем image_path_or_surface если он передан, иначе наш дефолтный путь
+        path = "sprites/plants/grownPlants/wheat.png" if image_path_or_surface is None else image_path_or_surface
+        super().__init__("Пшеница", path, "crop", stackable=True, max_stack=99, quantity=quantity,
+                         description=description, scale_to_size=scale_to_size)
+        # self.quantity уже устанавливается в super().__init__
+
+class Mater(Item):
+    def __init__(self, name, image, mat_type):
+        # Семена стакаются (например, до 20 штук)
+        super().__init__(name, image, 'mat', stackable=True, max_stack=10)
+        self.mat_type = mat_type
 
 
 ==================== map_renderer.py ====================
@@ -1623,126 +2298,164 @@ class MapRenderer:
 
 import pygame
 import os
+# Импортируем классы урожая, чтобы Plant мог их создавать
+# Убедитесь, что пути к файлам правильные: src.item, если Item находится в src/item.py
+from src.item import Tomato, Wheat
+
 
 class Plant(pygame.sprite.Sprite):
     def __init__(self, game_manager, plant_type, tile_x, tile_y):
         super().__init__()
-        self.game = game_manager # Ссылка на GameManager
-        self.plant_type = plant_type # Тип растения ('cucumber', 'tomato', 'potato')
-        self.tile_x = tile_x     # Координаты тайла, на котором растет растение
+        self.game = game_manager  # Ссылка на GameManager
+        self.plant_type = plant_type  # Тип растения ('cucumber', 'tomato', 'potato', 'wheat')
+        self.tile_x = tile_x  # Координаты тайла, на котором растет растение
         self.tile_y = tile_y
 
-        # Стадии роста и связанные с ними спрайты
-        # В будущем это можно вынести в отдельный файл конфигурации
+        # Определяем класс предмета урожая в зависимости от типа растения
+        if self.plant_type == "tomato":
+            self.harvest_item_class = Tomato
+            # Здесь можно определить количество стадий для каждого растения, если оно разное
+            # Например, self.known_num_stages = 4
+        elif self.plant_type == "wheat":
+            self.harvest_item_class = Wheat
+            # self.known_num_stages = 3
+        else:
+            self.harvest_item_class = None
+            print(f"Неизвестный тип растения: {plant_type}. Класс урожая не определен.")
+
         self.growth_stages_sprites = self.load_growth_sprites(plant_type)
-        self.current_stage = 0 # Начальная стадия роста (например, 0 - только что посажено)
-        self.max_stage = len(self.growth_stages_sprites) - 1 # Максимальная стадия (урожай готов)
+        self.current_stage = 0
+        # Максимальная стадия теперь определяется количеством загруженных спрайтов
+        self.max_stage = len(self.growth_stages_sprites) - 1
 
         self.image = self.growth_stages_sprites[self.current_stage]
-        # Устанавливаем позицию спрайта растения по центру тайла
-        # Нужно будет учесть смещение камеры при отрисовке
-        tile_size = self.game.tmx_data.tilewidth # Предполагается доступ к tmx_data через game_manager
+
+        tile_size = self.game.tmx_data.tilewidth  # Предполагается доступ к tmx_data через game_manager
         tile_center_x = self.tile_x * tile_size + tile_size // 2
         tile_center_y = self.tile_y * tile_size + tile_size // 2
         self.rect = self.image.get_rect(center=(tile_center_x, tile_center_y))
 
-        # Время, связанное с ростом
-        self.growth_timer = 0 # Таймер для перехода к следующей стадии
-        self.time_to_next_stage = 10 # Время в секундах до перехода к следующей стадии (для примера)
-
-        self.is_watered = False # Флаг, полито ли растение (для будущей механики полива)
-        self.ready_to_harvest = False # Флаг, готово ли к сбору урожая
+        self.growth_timer = 0
+        self.time_to_next_stage = 10  # Время в секундах до перехода к следующей стадии (для примера)
+        self.is_watered = False
+        self.ready_to_harvest = False
 
         print(f"Создано растение: {self.plant_type} на тайле ({self.tile_x}, {self.tile_y})")
-
 
     def load_growth_sprites(self, plant_type):
         """Загружает спрайты стадий роста для данного типа растения."""
         sprites = []
-        # Путь к спрайтам растений
         plant_sprites_dir = os.path.join("sprites", "plants", plant_type)
-        # Предполагаем, что спрайты названы stage_0.png, stage_1.png, ..., stage_4.png
-        num_stages = 5 # Количество стадий роста
+
+        # Вы можете сделать num_stages динамическим или передавать его в Plant.__init__
+        # Пока возьмем фиксированное число для примера или попробуем загрузить, пока есть файлы
+        # Или, если вы хотите, чтобы Tomato всегда имел 4 стадии, а Wheat 3, то можно это задать тут.
+        # Например:
+        if plant_type == "tomato":
+            num_expected_stages = 4  # Если у вас stage_0.png, stage_1.png, stage_2.png, stage_3.png
+        elif plant_type == "wheat":
+            num_expected_stages = 4  # Если у вас stage_0.png, stage_1.png, stage_2.png
+        else:
+            num_expected_stages = 5  # По умолчанию, если тип не tomato или wheat
+
         if not os.path.exists(plant_sprites_dir):
-             print(f"Ошибка: Папка со спрайтами для растения '{plant_type}' не найдена: {plant_sprites_dir}")
-             # В случае ошибки загрузки, добавим заглушку для каждой стадии
-             dummy = pygame.Surface((32, 32), pygame.SRCALPHA)
-             dummy.fill((255, 0, 0, 150)) # Полупрозрачный красный
-             return [dummy] * num_stages # Возвращаем список заглушек
-        for stage_index in range(num_stages):
+            print(f"Ошибка: Папка со спрайтами для растения '{plant_type}' не найдена: {plant_sprites_dir}")
+            dummy = pygame.Surface((32, 32), pygame.SRCALPHA)
+            dummy.fill((255, 0, 0, 150))
+            return [dummy] * num_expected_stages
+
+        # Загружаем спрайты до num_expected_stages
+        for stage_index in range(num_expected_stages):
             sprite_path = os.path.join(plant_sprites_dir, f"stage_{stage_index}.png")
             if os.path.exists(sprite_path):
                 try:
                     sprite = pygame.image.load(sprite_path).convert_alpha()
-                    # Опционально: масштабирование спрайта под размер тайла
-                    # Если тебе нужно масштабировать, раскомментируй и настрой этот блок:
                     if hasattr(self.game, 'tmx_data') and self.game.tmx_data:
-                          tile_size = self.game.tmx_data.tilewidth
-                          if sprite.get_size() != (tile_size, tile_size):
-                              sprite = pygame.transform.scale(sprite, (tile_size, tile_size))
+                        tile_size = self.game.tmx_data.tilewidth
+                        if sprite.get_size() != (tile_size, tile_size):
+                            sprite = pygame.transform.scale(sprite, (tile_size, tile_size))
                     sprites.append(sprite)
                 except pygame.error as e:
                     print(f"Ошибка загрузки спрайта {sprite_path}: {e}")
-                    # Добавляем заглушку в случае ошибки загрузки конкретного файла
                     dummy = pygame.Surface((32, 32), pygame.SRCALPHA)
-                    dummy.fill((100, 100, 100, 100)) # Полупрозрачный серый
+                    dummy.fill((100, 100, 100, 100))
                     sprites.append(dummy)
             else:
                 print(f"Предупреждение: Файл спрайта не найден: {sprite_path}. Добавляется заглушка.")
-                # Добавляем заглушку, если файл спрайта отсутствует
                 dummy = pygame.Surface((32, 32), pygame.SRCALPHA)
-                dummy.fill((100, 100, 100, 100)) # Полупрозрачный серый
+                dummy.fill((100, 100, 100, 100))
                 sprites.append(dummy)
+
         if not sprites:
-            print(f"Предупреждение: Не загружено ни одного спрайта для растения типа '{plant_type}'. Возвращается одна заглушка.")
-            # Если по какой-то причине список спрайтов пуст, возвращаем хотя бы одну заглушку
+            print(
+                f"Предупреждение: Не загружено ни одного спрайта для растения типа '{plant_type}'. Возвращается одна заглушка.")
             dummy = pygame.Surface((32, 32), pygame.SRCALPHA)
-            dummy.fill((255, 0, 0, 100)) # Полупрозрачный красный
+            dummy.fill((255, 0, 0, 100))
             return [dummy]
-        # Устанавливаем максимальную стадию на основе количества загруженных спрайтов
-        self.max_stage = len(sprites) - 1
-        print(f"Для растения '{plant_type}' загружено {len(sprites)} стадий роста. Максимальная стадия: {self.max_stage}")
+
+        # Устанавливаем max_stage на основе фактически загруженных спрайтов
+        # Важно: это переопределяет initial self.max_stage, если оно было установлено ранее
+        # self.max_stage = len(sprites) - 1 # Это будет установлено в __init__ после возврата
+        print(f"Для растения '{plant_type}' загружено {len(sprites)} стадий роста.")
         return sprites
 
     def update(self, dt):
         """Обновление состояния растения (рост)."""
-        # Логика роста будет здесь
-        # Пока простая заглушка: растение растет со временем
         if not self.ready_to_harvest:
             self.growth_timer += dt
             if self.growth_timer >= self.time_to_next_stage:
                 self.growth_timer = 0
-                self.grow() # Переход к следующей стадии роста
+                self.grow()
 
     def grow(self):
         """Переход к следующей стадии роста."""
         if self.current_stage < self.max_stage:
             self.current_stage += 1
-            self.image = self.growth_stages_sprites[self.current_stage]
+            # Убедитесь, что индекс находится в пределах списка спрайтов
+            if self.current_stage < len(self.growth_stages_sprites):
+                self.image = self.growth_stages_sprites[self.current_stage]
+            else:  # Если вдруг вышли за пределы, используем последний доступный спрайт
+                self.image = self.growth_stages_sprites[self.max_stage]
+
             print(f"Растение {self.plant_type} на ({self.tile_x}, {self.tile_y}) перешло в стадию {self.current_stage}")
 
             if self.current_stage == self.max_stage:
                 self.ready_to_harvest = True
                 print(f"Растение {self.plant_type} на ({self.tile_x}, {self.tile_y}) готово к сбору урожая!")
 
-
     def water(self):
         """Поливает растение."""
-        # Пока заглушка, в будущем может влиять на скорость роста
         self.is_watered = True
         print(f"Растение {self.plant_type} на ({self.tile_x}, {self.tile_y}) полито.")
 
     def harvest(self):
-        """Собирает урожай с растения."""
+        """Собирает урожай с растения.
+        Возвращает созданный объект урожая (например, Tomato, Wheat) или None.
+        """
         if self.ready_to_harvest:
             print(f"Урожай с растения {self.plant_type} на ({self.tile_x}, {self.tile_y}) собран.")
-            # TODO: Добавить логику получения предметов урожая игроком
-            # TODO: Удалить объект растения с карты
-            return True # Урожай собран успешно
-        else:
-            print(f"Растение {self.plant_type} на ({self.tile_x}, {tile_y}) еще не готово к сбору урожая.")
-            return False # Не готово к сбору
 
+            if self.harvest_item_class:
+                # Определяем размер спрайта для предмета в инвентаре.
+                # Можно использовать фиксированный размер, или относительный от размера тайла.
+                # Предположим, что предметы в инвентаре должны быть меньше, чем тайлы на карте.
+                # Если у вас есть InventoryManager с заданным размером слотов, можно брать оттуда.
+                # Например, 32x32 пикселя для иконки предмета.
+
+                # Если у вас есть доступ к game.TILE_SIZE:
+                if hasattr(self.game, 'TILE_SIZE'):
+                    item_sprite_size = (self.game.TILE_SIZE // 2, self.game.TILE_SIZE // 2)
+                else:
+                    item_sprite_size = (32, 32)  # Размер по умолчанию, если TILE_SIZE недоступен
+
+                # Создаем экземпляр класса урожая, передавая ему размер для его спрайта
+                return self.harvest_item_class(quantity=1, scale_to_size=item_sprite_size)
+            else:
+                print(f"Для растения {self.plant_type} не определен класс урожая, или он недоступен.")
+                return None
+        else:
+            print(f"Растение {self.plant_type} на ({self.tile_x}, {self.tile_y}) еще не готово к сбору урожая.")
+            return None
 
 
 ==================== player.py ====================
@@ -1851,7 +2564,9 @@ class Player(pygame.sprite.Sprite):
             "left": [],
             "right": [],
             "up": [],
-            "hoe_swing": [], # Анимация для взмаха мотыгой
+            "hoe_swing": [],
+            "shovel_swing": [],
+            "watering_can_swing": [],
             # Добавьте другие анимации инструментов здесь
         }
 
@@ -1885,7 +2600,6 @@ class Player(pygame.sprite.Sprite):
                         dummy = pygame.Surface((16, 16))
                         dummy.fill((255, 0, 255))
                         sprites.append(dummy)
-
                 for direction, indices in directions_map.items():
                     for idx in indices:
                         if idx < len(sprites):
@@ -1916,7 +2630,6 @@ class Player(pygame.sprite.Sprite):
                         loaded_frames += 1
                     else:
                         print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха мотыгой. Проверьте имя файла.")
-
                 if loaded_frames == 0:
                     print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха мотыгой из {hoe_swing_sprites_dir}. Проверьте имена файлов ({', '.join(hoe_swing_files)}).")
                     if animations["down"]:
@@ -1942,8 +2655,146 @@ class Player(pygame.sprite.Sprite):
                  dummy.fill((255, 0, 255))
                  animations["hoe_swing"] = [dummy]
 
+                 # --- Загрузка анимации взмаха лейкой ---
+            watering_can_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "watering_can_swing")
+            # Убедитесь, что у вас есть эти файлы в указанной директории
+            watering_can_swing_files = ["frame_0.png", "frame_1.png"]  # Или больше, если у вас более сложная анимация
+            if os.path.exists(watering_can_swing_sprites_dir):
+                try:
+                    loaded_frames = 0
+                    for filename in watering_can_swing_files:
+                        img_path = os.path.join(watering_can_swing_sprites_dir, filename)
+                        if os.path.exists(img_path):
+                            sprite = pygame.image.load(img_path).convert_alpha()
+                            # Масштабируйте, если нужно, до размера игрока
+                            # sprite = pygame.transform.scale(sprite, (70, 92))
+                            animations["watering_can_swing"].append(sprite)
+                            loaded_frames += 1
+                        else:
+                            print(
+                                f"Предупреждение: Файл {img_path} не найден для анимации взмаха лейкой. Проверьте имя файла.")
+                    if loaded_frames == 0:
+                        print(
+                            f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лейкой из {watering_can_swing_sprites_dir}. Проверьте имена файлов ({', '.join(watering_can_swing_files)}).")
+                        if animations["down"]:  # Fallback к анимации "вниз"
+                            animations["watering_can_swing"] = [animations["down"][0]]
+                        else:  # Fallback к пустой заглушке
+                            dummy = pygame.Surface((32, 32))
+                            dummy.fill((255, 0, 255))
+                            animations["watering_can_swing"] = [dummy]
+                except Exception as e:
+                    print(f"Ошибка при загрузке анимации взмаха лейкой из {watering_can_swing_sprites_dir}: {e}")
+                    if animations["down"]:  # Fallback к анимации "вниз"
+                        animations["watering_can_swing"] = [animations["down"][0]]
+                    else:  # Fallback к пустой заглушке
+                        dummy = pygame.Surface((32, 32))
+                        dummy.fill((255, 0, 255))
+                        animations["watering_can_swing"] = [dummy]
+            else:
+                print(f"Предупреждение: Папка анимации взмаха лейкой не найдена: {watering_can_swing_sprites_dir}")
+                if animations["down"]:  # Fallback к анимации "вниз"
+                    animations["watering_can_swing"] = [animations["down"][0]]
+                else:  # Fallback к пустой заглушке
+                    dummy = pygame.Surface((32, 32))
+                    dummy.fill((255, 0, 255))
+                    animations["watering_can_swing"] = [dummy]
+            print(f"Загружено {len(animations['watering_can_swing'])} кадров для анимации взмаха лейкой.")
+            return animations
+
         print(f"Загружено {len(animations['hoe_swing'])} кадров для анимации взмаха мотыгой.")
+
+        # --- Загрузка анимации взмаха лопатой ---
+        shovel_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "shovel_swing")
+        # Убедитесь, что у вас есть эти файлы в указанной директории
+        shovel_swing_files = ["frame_0.png", "frame_1.png"] # Или больше, если у вас более сложная анимация
+
+        if os.path.exists(shovel_swing_sprites_dir):
+            try:
+                loaded_frames = 0
+                for filename in shovel_swing_files:
+                    img_path = os.path.join(shovel_swing_sprites_dir, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # Масштабируйте, если нужно, до размера игрока
+                        # sprite = pygame.transform.scale(sprite, (70, 92))
+                        animations["shovel_swing"].append(sprite)
+                        loaded_frames += 1
+                    else:
+                        print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха лопатой. Проверьте имя файла.")
+                if loaded_frames == 0:
+                    print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лопатой из {shovel_swing_sprites_dir}. Проверьте имена файлов ({', '.join(shovel_swing_files)}).")
+                    if animations["down"]: # Fallback к анимации "вниз"
+                         animations["shovel_swing"] = [animations["down"][0]]
+                    else: # Fallback к пустой заглушке
+                         dummy = pygame.Surface((32, 32))
+                         dummy.fill((255, 0, 255))
+                         animations["shovel_swing"] = [dummy]
+            except Exception as e:
+                print(f"Ошибка при загрузке анимации взмаха лопатой из {shovel_swing_sprites_dir}: {e}")
+                if animations["down"]: # Fallback к анимации "вниз"
+                     animations["shovel_swing"] = [animations["down"][0]]
+                else: # Fallback к пустой заглушке
+                     dummy = pygame.Surface((32, 32))
+                     dummy.fill((255, 0, 255))
+                     animations["shovel_swing"] = [dummy]
+        else:
+            print(f"Предупреждение: Папка анимации взмаха лопатой не найдена: {shovel_swing_sprites_dir}")
+            if animations["down"]: # Fallback к анимации "вниз"
+                 animations["shovel_swing"] = [animations["down"][0]]
+            else: # Fallback к пустой заглушке
+                 dummy = pygame.Surface((32, 32))
+                 dummy.fill((255, 0, 255))
+                 animations["shovel_swing"] = [dummy]
+
+        print(f"Загружено {len(animations['shovel_swing'])} кадров для анимации взмаха лопатой.")
+
+        # --- Загрузка анимации взмаха лейкой ---
+        watering_can_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "watering_can_swing")
+        # Убедитесь, что у вас есть эти файлы в указанной директории
+        watering_can_swing_files = ["frame_0.png", "frame_1.png"]  # Или больше, если у вас более сложная анимация
+        if os.path.exists(watering_can_swing_sprites_dir):
+            try:
+                loaded_frames = 0
+                for filename in watering_can_swing_files:
+                    img_path = os.path.join(watering_can_swing_sprites_dir, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # Масштабируйте, если нужно, до размера игрока
+                        # sprite = pygame.transform.scale(sprite, (70, 92))
+                        animations["watering_can_swing"].append(sprite)
+                        loaded_frames += 1
+                    else:
+                        print(
+                            f"Предупреждение: Файл {img_path} не найден для анимации взмаха лейкой. Проверьте имя файла.")
+                if loaded_frames == 0:
+                    print(
+                        f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лейкой из {watering_can_swing_sprites_dir}. Проверьте имена файлов ({', '.join(watering_can_swing_files)}).")
+                    if animations["down"]:  # Fallback к анимации "вниз"
+                        animations["watering_can_swing"] = [animations["down"][0]]
+                    else:  # Fallback к пустой заглушке
+                        dummy = pygame.Surface((32, 32))
+                        dummy.fill((255, 0, 255))
+                        animations["watering_can_swing"] = [dummy]
+            except Exception as e:
+                print(f"Ошибка при загрузке анимации взмаха лейкой из {watering_can_swing_sprites_dir}: {e}")
+                if animations["down"]:  # Fallback к анимации "вниз"
+                    animations["watering_can_swing"] = [animations["down"][0]]
+                else:  # Fallback к пустой заглушке
+                    dummy = pygame.Surface((32, 32))
+                    dummy.fill((255, 0, 255))
+                    animations["watering_can_swing"] = [dummy]
+        else:
+            print(f"Предупреждение: Папка анимации взмаха лейкой не найдена: {watering_can_swing_sprites_dir}")
+            if animations["down"]:  # Fallback к анимации "вниз"
+                animations["watering_can_swing"] = [animations["down"][0]]
+            else:  # Fallback к пустой заглушке
+                dummy = pygame.Surface((32, 32))
+                dummy.fill((255, 0, 255))
+                animations["watering_can_swing"] = [dummy]
+        print(f"Загружено {len(animations['watering_can_swing'])} кадров для анимации взмаха лейкой.")
         return animations
+
+
 
     # --- Добавлен метод handle_input для обработки событий, специфичных для игрока ---
     def handle_input(self, event):
@@ -1959,15 +2810,13 @@ class Player(pygame.sprite.Sprite):
                     if 0 <= selected_item_index < len(self.game.inventory_manager.hotbar_slots):
                         selected_item = self.game.inventory_manager.hotbar_slots[selected_item_index]
                         # --- Проверяем, является ли предмет инструментом (например, мотыгой) ---
-                        if selected_item and isinstance(selected_item, Tool): # Используем isinstance(selected_item, Tool)
-                             if selected_item.type == 'hoe' and not self.is_using_tool:
-                                 self.use_tool() # Вызываем метод использования инструмента
-                             # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
-                             # elif selected_item.type == 'axe' and not self.is_using_tool:
-                             #     self.use_tool() # Запускаем анимацию топора
-                             # elif selected_item.type == 'wateringcan' and not self.is_using_tool:
-                             #     self.use_tool() # Запускаем анимацию лейки
-                             # ...
+                        if selected_item and isinstance(selected_item,
+                                                        Tool):  # Используем isinstance(selected_item, Tool)
+                            if selected_item.tool_type == 'hoe' and not self.is_using_tool:
+                                self.use_tool()  # Вызываем метод использования инструмента
+                            # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                            elif selected_item.tool_type == 'shovel' and not self.is_using_tool:  # <-- ДОБАВЬТЕ ЭТОТ БЛОК
+                                self.use_tool()
                         # --- Проверяем, является ли предмет семенем ---
                         elif selected_item and isinstance(selected_item, Seed):
                             target_tile_x, target_tile_y = self.get_tile_in_front()
@@ -1979,26 +2828,33 @@ class Player(pygame.sprite.Sprite):
                                         selected_item.quantity -= 1
                                         if selected_item.quantity <= 0:
                                             # Удаляем предмет из инвентаря, если закончился
-                                            self.game.inventory_manager.hotbar_slots[self.game.inventory_manager.selected_item_index] = None
-                                        
+                                            self.game.inventory_manager.hotbar_slots[
+                                                self.game.inventory_manager.selected_item_index] = None
+
                                         # Создаем новое растение
-                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x, target_tile_y)
-                                        
+                                        new_plant = Plant(self.game, selected_item.plant_type, target_tile_x,
+                                                          target_tile_y)
+
                                         # Добавляем растение в группы спрайтов
                                         if hasattr(self.game, 'all_sprites') and hasattr(self.game, 'plants'):
                                             self.game.all_sprites.add(new_plant)
                                             self.game.plants.add(new_plant)
-                                            print(f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
-                                        
+                                            print(
+                                                f"Объект растения {new_plant.plant_type} создан и добавлен в группы спрайтов.")
+
                                         # Обновляем состояние тайла
                                         self.game.update_tile_state(target_tile_x, target_tile_y, has_plant=new_plant)
                                     else:
-                                        print(f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
+                                        print(
+                                            f"Ошибка: У выбранного семени {selected_item.name} нет атрибута 'plant_type'.")
                                 else:
                                     print("На этой земле нельзя сажать.")
                             else:
                                 print("Неверные координаты тайла или метод is_tile_plantable не найден в GameManager.")
-            # Обработка движения (клавиши get_pressed() обрабатываются в update)
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_g:
+                    self.harvest_plant()
             pass
 
     def update(self, dt):
@@ -2157,12 +3013,13 @@ class Player(pygame.sprite.Sprite):
                              # print("Не удалось определить координаты тайла перед игроком или GameManager не имеет till_tile.") # Отладочный принт
 
                 # TODO: Добавить вызовы действий для других инструментов в соответствующие моменты анимации
-                # elif self.current_tool_animation_type == 'axe_swing':
-                #     if prev_frame == X and self.tool_use_current_frame == Y:
-                #         self.game.cut_tree(...) # Вызов функции рубки дерева
-                # elif self.current_tool_animation_type == 'watering_can':
-                #     if prev_frame == X and self.tool_use_current_frame == Y:
-                #         self.game.water_tile(...) # Вызов функции полива
+                elif self.current_tool_animation_type == 'shovel_swing':  # <-- ДОБАВЬТЕ ЭТОТ БЛОК
+                    # Предположим, что действие происходит на том же кадре
+                    if prev_frame == 0 and self.tool_use_current_frame == 1:
+                        target_tile_x, target_tile_y = self.get_tile_in_front()
+                        if self.game and hasattr(self.game, 'untill_tile') and (
+                                target_tile_x != -1 or target_tile_y != -1):
+                            self.game.untill_tile(target_tile_x, target_tile_y)
 
         else:
             # Если нет текущей анимации инструмента или она пуста, сбрасываем флаг использования инструмента
@@ -2194,13 +3051,18 @@ class Player(pygame.sprite.Sprite):
         selected_item = inventory_manager.hotbar_slots[selected_item_index]
 
         if selected_item and isinstance(selected_item, Tool):
-            if selected_item.type == 'hoe':
+            if selected_item.tool_type == 'hoe':
                 self.is_using_tool = True
                 self.tool_use_animation_timer = 0
                 self.tool_use_current_frame = 0
                 self.current_tool_animation_type = 'hoe_swing'
                 # Логика вызова till_tile ПЕРЕНЕСЕНА в update_tool_use_animation!
             # TODO: Добавить запуск анимаций для других инструментов
+            elif selected_item.tool_type == 'shovel':  # <-- ДОБАВЬТЕ ЭТОТ БЛОК
+                self.is_using_tool = True
+                self.tool_use_animation_timer = 0
+                self.tool_use_current_frame = 0
+                self.current_tool_animation_type = 'shovel_swing'
             # elif selected_item.type == 'axe':
             #     self.is_using_tool = True
             #     self.tool_use_animation_timer = 0
@@ -2246,6 +3108,39 @@ class Player(pygame.sprite.Sprite):
         target_tile_y = max(0, min(target_tile_y, map_height_tiles - 1))
 
         return target_tile_x, target_tile_y
+
+    ### Работа с урожаем ###
+    def harvest_plant(self):
+        """Пытается собрать урожай с растения перед игроком."""
+        target_tile_x, target_tile_y = self.get_tile_in_front()
+        if self.game and hasattr(self.game, 'tile_states'):
+            tile_coords = (target_tile_x, target_tile_y)
+            tile_state = self.game.tile_states.get(tile_coords)
+            if tile_state and tile_state.get('has_plant'):
+                plant_obj = tile_state.get('has_plant')  # Получаем объект растения
+                if isinstance(plant_obj, Plant) and plant_obj.ready_to_harvest:
+                    # <<< ИЗМЕНЕНИЯ ЗДЕСЬ >>>
+                    harvested_item = plant_obj.harvest() # plant.harvest() теперь возвращает объект урожая (Tomato/Wheat)
+                    if harvested_item: # Если урожай был успешно получен (не None)
+                        plant_obj.kill()  # Удаляем спрайт растения
+                        # Обновляем состояние тайла
+                        self.game.update_tile_state(target_tile_x, target_tile_y, has_plant=False, is_tilled=True)
+                        # Добавляем полученный предмет урожая в инвентарь игрока
+                        if self.game.inventory_manager:
+                            # Предполагается, что add_item_to_inventory умеет работать с уже созданным объектом Item
+                            # и его количеством.
+                            self.game.inventory_manager.add_item(harvested_item, quantity=harvested_item.quantity)
+                            print(f"Игрок получил {harvested_item.quantity}x {harvested_item.name}!")
+                        else:
+                            print("Ошибка: InventoryManager не доступен для добавления урожая.")
+                    else:
+                        print(f"Растение {plant_obj.plant_type} на ({target_tile_x}, {target_tile_y}) не дало урожая.")
+                    # <<< КОНЕЦ ИЗМЕНЕНИЙ >>>
+                else:
+                    print(
+                        f"Растение на ({target_tile_x}, {target_tile_y}) еще не готово к сбору или не является растением.")
+            else:
+                print(f"На тайле ({target_tile_x}, {target_tile_y}) нет растения для сбора.")
 
 
 ==================== render_manager.py ====================

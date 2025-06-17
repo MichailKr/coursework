@@ -56,7 +56,7 @@ class Plant(pygame.sprite.Sprite):
         if plant_type == "tomato":
             num_expected_stages = 4  # Если у вас stage_0.png, stage_1.png, stage_2.png, stage_3.png
         elif plant_type == "wheat":
-            num_expected_stages = 3  # Если у вас stage_0.png, stage_1.png, stage_2.png
+            num_expected_stages = 4  # Если у вас stage_0.png, stage_1.png, stage_2.png
         else:
             num_expected_stages = 5  # По умолчанию, если тип не tomato или wheat
 

@@ -74,6 +74,8 @@ class GameManager:
         base_sprites_path = os.path.join("sprites", "player", "sprites_tools")
         hoe_image_path = os.path.join(base_sprites_path, 'hoe.png')
 
+        ### Мотыга
+
         try:
              hoe_image = pygame.image.load(hoe_image_path).convert_alpha()
              print(f"Изображение мотыги успешно загружено по пути: {hoe_image_path}")
@@ -83,6 +85,31 @@ class GameManager:
              print(f"Проверьте путь к файлу: {hoe_image_path}")
         except Exception as e:
              print(f"Произошла другая ошибка при создании объекта Tool для мотыги: {e}")
+
+        ### лопата
+
+        shovel_image_path = os.path.join(base_sprites_path, 'shovel.png')  # Убедитесь, что shovel.png существует
+        try:
+            shovel_image = pygame.image.load(shovel_image_path).convert_alpha()
+            print(f"Изображение лопаты успешно загружено по пути: {shovel_image_path}")
+            self.tools['shovel'] = Tool('Лопата', shovel_image, 'shovel')
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображения лопаты: {e}")
+            print(f"Проверьте путь к файлу: {shovel_image_path}")
+        except Exception as e:
+            print(f"Произошла другая ошибка при создании объекта Tool для лопаты: {e}")
+
+        watering_can_image_path = os.path.join(base_sprites_path,
+                                               'watering_can.png')  # Убедитесь, что watering_can.png существует
+        try:
+            watering_can_image = pygame.image.load(watering_can_image_path).convert_alpha()
+            print(f"Изображение лейки успешно загружено по пути: {watering_can_image_path}")
+            self.tools['watering_can'] = Tool('Лейка', watering_can_image, 'watering_can')
+        except pygame.error as e:
+            print(f"Ошибка загрузки изображения лейки: {e}")
+            print(f"Проверьте путь к файлу: {watering_can_image_path}")
+        except Exception as e:
+            print(f"Произошла другая ошибка при создании объекта Tool для лейки: {e}")
 
 
         # Добавьте загрузку и создание объектов для других инструментов аналогично
@@ -128,6 +155,7 @@ class GameManager:
             self.soil_layer = self.tmx_data.get_layer_by_name('Песочек')
             self.grass_layer = self.tmx_data.get_layer_by_name('Травка')
 
+
             # Получаем объекты слоев коллизий
             for layer_name in self.collision_layers_names:
                  layer = self.tmx_data.get_layer_by_name(layer_name)
@@ -139,6 +167,8 @@ class GameManager:
 
             # Получаем GID тайла земли по свойству
             self.dirt_tile_gid = self.get_tile_gid_by_property('type', 'dirt')
+            self.grass_tile_gid = self.get_tile_gid_by_property('type', 'grass')
+            self.moist_dirt_tile_gid = self.get_tile_gid_by_property('type', 'moist_dirt')
 
             # Проверки наличия слоев и GID
             if not self.soil_layer:
@@ -147,6 +177,8 @@ class GameManager:
                  print("Внимание: Слой 'Травка' не найден в карте. Вспашка не будет работать корректно.")
             if self.dirt_tile_gid is None:
                  print("Внимание: GID тайла земли не найден по свойству 'type'='dirt'. Вспашка не будет работать корректно.")
+            if self.moist_dirt_tile_gid is None:  # <-- ДОБАВЬТЕ ЭТУ ПРОВЕРКУ
+                print("Внимание: GID тайла 'moist_dirt' не найден по свойству 'type'='moist_dirt'. Поливка не будет работать корректно.")
 
         except FileNotFoundError:
              print(f"Ошибка загрузки карты: Файл карты не найден по пути: {map_path}")
@@ -257,6 +289,36 @@ class GameManager:
         else:
             print("Ошибка: Мотыга не найдена в словаре self.tools или не была загружена.")
             # --- Конец блока изменения для мотыги ---
+        if 'shovel' in self.tools:  # Проверяем, что лопата была успешно загружена в self.tools
+            print("Лопата найдена в self.tools.")
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
+                # Добавляем лопату, например, в слот 3 (индекс 2), если 0 и 1 заняты мотыгой и пшеницей
+                # Или в любой другой свободный слот, который вы хотите
+                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['shovel'],
+                                                                              slot_index=3)  # Пример
+                if success:
+                    print("Лопата добавлена в инвентарь игрока через InventoryManager.")
+                else:
+                    print("Ошибка: Не удалось добавить лопату в инвентарь через InventoryManager.")
+            else:
+                print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
+        else:
+            print("Ошибка: Лопата не найдена в словаре self.tools (возможно, не удалось загрузить изображение).")
+
+        if 'watering_can' in self.tools:
+            print("Лейка найдена в self.tools.")
+            if hasattr(self, 'inventory_manager') and isinstance(self.inventory_manager, InventoryManager):
+                # Добавляем лейку, например, в слот 4 (индекс 3)
+                success = self.inventory_manager.add_item_by_slot_or_find(self.tools['watering_can'],
+                                                                              slot_index=4)  # Пример
+                if success:
+                    print("Лейка добавлена в инвентарь игрока через InventoryManager.")
+                else:
+                    print("Ошибка: Не удалось добавить лейку в инвентарь через InventoryManager.")
+            else:
+                print("Ошибка: InventoryManager не инициализирован или имеет неправильный тип.")
+        else:
+            print("Ошибка: Лейка не найдена в словаре self.tools (возможно, не удалось загрузить изображение).")
             # --- Добавляем семена пшеницы и томатов в инвентарь игрока ---
         try:
             # Путь к спрайтам предметов (семян)
@@ -378,6 +440,118 @@ class GameManager:
         else:
              # print("Клетка пустая (GID 0). Вспашка не требуется.") # Отладочный вывод
              pass # Нет необходимости в отладочном выводе для пустых клеток
+
+    def untill_tile(self, tile_x, tile_y):
+        """
+        Изменяет вспаханный тайл (грязь/песок) на тайл травы по указанным координатам и
+        обновляет состояние тайла.
+        """
+        print(f"Попытка вернуть траву на клетку: ({tile_x}, {tile_y})")
+
+        if not self.tmx_data or not self.soil_layer or not isinstance(self.soil_layer, pytmx.TiledTileLayer) or \
+                not self.grass_layer or not isinstance(self.grass_layer,
+                                                       pytmx.TiledTileLayer) or self.grass_tile_gid is None:
+            print("Ошибка в untill_tile: Не все необходимые данные карты загружены или имеют правильный тип. Возврат.")
+            return
+
+        map_width_tiles = self.tmx_data.width
+        map_height_tiles = self.tmx_data.height
+
+        if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
+            print(f"Предупреждение в untill_tile: Координаты ({tile_x}, {tile_y}) вне границ карты. Возврат.")
+            return
+
+        # Получаем состояние тайла
+        tile_coords = (tile_x, tile_y)
+        tile_state = self.tile_states.get(tile_coords, {})
+
+        # Проверяем, вспахан ли тайл (для лопаты это необходимо) и нет ли на нем растения
+        if tile_state.get('is_tilled', False) and not tile_state.get('has_plant', False):
+            # Если на тайле есть растение, лопатой его не убираем (пока)
+            print(f"Клетка ({tile_x}, {tile_y}) вспахана и свободна. Возвращаем траву.")
+
+            # Удаляем тайл грязи/песка со слоя "Песочек"
+            self.soil_layer.data[tile_y][tile_x] = 0  # Стираем тайл с песком
+
+            # Ставим тайл травы на слой "Травка"
+            # Важно: Здесь мы предполагаем, что если есть вспашка, то на слое "Травка" было 0.
+            # Если нет, то мы просто восстанавливаем GID травы.
+            self.grass_layer.data[tile_y][tile_x] = self.grass_tile_gid
+
+            # Обновляем состояние тайла
+            self.update_tile_state(tile_x, tile_y, is_tilled=False, has_plant=False)
+            print(f"Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}")
+        else:
+            print(f"Клетка ({tile_x}, {tile_y}) не является вспаханной и/или содержит растение. Лопата бесполезна.")
+
+    def water_tile(self, tile_x, tile_y):
+        """
+        Поливает вспаханный тайл, изменяя его на "мокрый песочек" (moist_dirt)
+        и обновляя состояние тайла.
+        Наличие растения на тайле не препятствует поливу.
+        """
+        print(f"water_tile: Попытка полить клетку: ({tile_x}, {tile_y})")
+
+        # Проверка на наличие необходимых данных и их корректность
+        if not self.tmx_data or not self.soil_layer or not isinstance(self.soil_layer, pytmx.TiledTileLayer) or \
+                self.moist_dirt_tile_gid is None or self.dirt_tile_gid is None:
+            print(
+                "water_tile: Ошибка: Не все необходимые данные карты загружены или имеют правильный тип (moist_dirt_tile_gid или dirt_tile_gid is None). Возврат.")
+            return
+
+        # Проверка координат на границы карты
+        map_width_tiles = self.tmx_data.width
+        map_height_tiles = self.tmx_data.height
+        if not (0 <= tile_x < map_width_tiles and 0 <= tile_y < map_height_tiles):
+            print(f"water_tile: Предупреждение: Координаты ({tile_x}, {tile_y}) вне границ карты. Возврат.")
+            return
+
+        # Получаем текущее состояние тайла из словаря tile_states
+        tile_coords = (tile_x, tile_y)
+        tile_state = self.tile_states.get(tile_coords, {})
+        print(f"water_tile: Текущее состояние для ({tile_x}, {tile_y}): {tile_state}")
+
+        is_tilled = tile_state.get('is_tilled', False)
+        is_watered = tile_state.get('is_watered', False)
+        has_plant = tile_state.get('has_plant', False)  # Проверим, есть ли растение
+
+        # Получаем текущий GID тайла на слое "Песочек"
+        current_soil_gid = self.soil_layer.data[tile_y][tile_x]
+        print(f"water_tile: Текущий GID на слое 'Песочек': {current_soil_gid}")
+
+        # Основное условие для полива: тайл должен быть вспахан и не полит
+        if is_tilled and not is_watered:
+            # Тайлы, которые можно поливать:
+            # 1. Обычный (сухой) песок (dirt_tile_gid)
+            # 2. Тайлы, которые уже выглядят как мокрый песок, но их состояние is_watered почему-то False
+
+            if current_soil_gid == self.dirt_tile_gid:
+                print(
+                    f"water_tile: Клетка ({tile_x}, {tile_y}) вспахана, не полита, и является сухим песком. Поливаем.")
+                # Изменяем GID на слое "Песочек" на GID мокрого песочка
+                self.soil_layer.data[tile_y][tile_x] = self.moist_dirt_tile_gid
+                # Обновляем состояние тайла как политый
+                self.update_tile_state(tile_x, tile_y, is_watered=True)
+                print(f"water_tile: Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}")
+            elif current_soil_gid == self.moist_dirt_tile_gid:
+                print(
+                    f"water_tile: Клетка ({tile_x}, {tile_y}) вспахана, уже является мокрым песком, но is_watered было False. Исправляем состояние.")
+                # Если тайл уже визуально мокрый, но флаг 'is_watered' не установлен, устанавливаем его.
+                self.update_tile_state(tile_x, tile_y, is_watered=True)
+                print(f"water_tile: Состояние тайла ({tile_x}, {tile_y}) обновлено: {self.tile_states[tile_coords]}")
+            else:
+                # Сюда попадут тайлы, которые вспаханы и не политы, но их GID на слое "Песочек"
+                # не соответствует ни сухому, ни мокрому песку.
+                # Это может быть ошибкой в логике GID или если на слое "Песочек" что-то другое.
+                print(
+                    f"water_tile: Клетка ({tile_x}, {tile_y}) вспахана и не полита, но текущий GID ({current_soil_gid}) не является ни 'dirt', ни 'moist_dirt'. Поливать нечего.")
+
+        else:
+            # Сюда попадает, если тайл:
+            # 1. Не вспахан (is_tilled is False)
+            # 2. Уже полит (is_watered is True)
+            print(
+                f"water_tile: Клетка ({tile_x}, {tile_y}) не может быть полита. is_tilled={is_tilled}, is_watered={is_watered}. Имеет растение: {bool(has_plant)}.")
 
     def update_tile_state(self, tile_x, tile_y, **kwargs):
         """Обновляет состояние тайла по указанным координатам."""

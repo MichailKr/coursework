@@ -102,7 +102,9 @@ class Player(pygame.sprite.Sprite):
             "left": [],
             "right": [],
             "up": [],
-            "hoe_swing": [], # Анимация для взмаха мотыгой
+            "hoe_swing": [],
+            "shovel_swing": [],
+            "watering_can_swing": [],
             # Добавьте другие анимации инструментов здесь
         }
 
@@ -136,7 +138,6 @@ class Player(pygame.sprite.Sprite):
                         dummy = pygame.Surface((16, 16))
                         dummy.fill((255, 0, 255))
                         sprites.append(dummy)
-
                 for direction, indices in directions_map.items():
                     for idx in indices:
                         if idx < len(sprites):
@@ -167,7 +168,6 @@ class Player(pygame.sprite.Sprite):
                         loaded_frames += 1
                     else:
                         print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха мотыгой. Проверьте имя файла.")
-
                 if loaded_frames == 0:
                     print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха мотыгой из {hoe_swing_sprites_dir}. Проверьте имена файлов ({', '.join(hoe_swing_files)}).")
                     if animations["down"]:
@@ -193,8 +193,146 @@ class Player(pygame.sprite.Sprite):
                  dummy.fill((255, 0, 255))
                  animations["hoe_swing"] = [dummy]
 
+                 # --- Загрузка анимации взмаха лейкой ---
+            watering_can_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "watering_can_swing")
+            # Убедитесь, что у вас есть эти файлы в указанной директории
+            watering_can_swing_files = ["frame_0.png", "frame_1.png"]  # Или больше, если у вас более сложная анимация
+            if os.path.exists(watering_can_swing_sprites_dir):
+                try:
+                    loaded_frames = 0
+                    for filename in watering_can_swing_files:
+                        img_path = os.path.join(watering_can_swing_sprites_dir, filename)
+                        if os.path.exists(img_path):
+                            sprite = pygame.image.load(img_path).convert_alpha()
+                            # Масштабируйте, если нужно, до размера игрока
+                            # sprite = pygame.transform.scale(sprite, (70, 92))
+                            animations["watering_can_swing"].append(sprite)
+                            loaded_frames += 1
+                        else:
+                            print(
+                                f"Предупреждение: Файл {img_path} не найден для анимации взмаха лейкой. Проверьте имя файла.")
+                    if loaded_frames == 0:
+                        print(
+                            f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лейкой из {watering_can_swing_sprites_dir}. Проверьте имена файлов ({', '.join(watering_can_swing_files)}).")
+                        if animations["down"]:  # Fallback к анимации "вниз"
+                            animations["watering_can_swing"] = [animations["down"][0]]
+                        else:  # Fallback к пустой заглушке
+                            dummy = pygame.Surface((32, 32))
+                            dummy.fill((255, 0, 255))
+                            animations["watering_can_swing"] = [dummy]
+                except Exception as e:
+                    print(f"Ошибка при загрузке анимации взмаха лейкой из {watering_can_swing_sprites_dir}: {e}")
+                    if animations["down"]:  # Fallback к анимации "вниз"
+                        animations["watering_can_swing"] = [animations["down"][0]]
+                    else:  # Fallback к пустой заглушке
+                        dummy = pygame.Surface((32, 32))
+                        dummy.fill((255, 0, 255))
+                        animations["watering_can_swing"] = [dummy]
+            else:
+                print(f"Предупреждение: Папка анимации взмаха лейкой не найдена: {watering_can_swing_sprites_dir}")
+                if animations["down"]:  # Fallback к анимации "вниз"
+                    animations["watering_can_swing"] = [animations["down"][0]]
+                else:  # Fallback к пустой заглушке
+                    dummy = pygame.Surface((32, 32))
+                    dummy.fill((255, 0, 255))
+                    animations["watering_can_swing"] = [dummy]
+            print(f"Загружено {len(animations['watering_can_swing'])} кадров для анимации взмаха лейкой.")
+            return animations
+
         print(f"Загружено {len(animations['hoe_swing'])} кадров для анимации взмаха мотыгой.")
+
+        # --- Загрузка анимации взмаха лопатой ---
+        shovel_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "shovel_swing")
+        # Убедитесь, что у вас есть эти файлы в указанной директории
+        shovel_swing_files = ["frame_0.png", "frame_1.png"] # Или больше, если у вас более сложная анимация
+
+        if os.path.exists(shovel_swing_sprites_dir):
+            try:
+                loaded_frames = 0
+                for filename in shovel_swing_files:
+                    img_path = os.path.join(shovel_swing_sprites_dir, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # Масштабируйте, если нужно, до размера игрока
+                        # sprite = pygame.transform.scale(sprite, (70, 92))
+                        animations["shovel_swing"].append(sprite)
+                        loaded_frames += 1
+                    else:
+                        print(f"Предупреждение: Файл {img_path} не найден для анимации взмаха лопатой. Проверьте имя файла.")
+                if loaded_frames == 0:
+                    print(f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лопатой из {shovel_swing_sprites_dir}. Проверьте имена файлов ({', '.join(shovel_swing_files)}).")
+                    if animations["down"]: # Fallback к анимации "вниз"
+                         animations["shovel_swing"] = [animations["down"][0]]
+                    else: # Fallback к пустой заглушке
+                         dummy = pygame.Surface((32, 32))
+                         dummy.fill((255, 0, 255))
+                         animations["shovel_swing"] = [dummy]
+            except Exception as e:
+                print(f"Ошибка при загрузке анимации взмаха лопатой из {shovel_swing_sprites_dir}: {e}")
+                if animations["down"]: # Fallback к анимации "вниз"
+                     animations["shovel_swing"] = [animations["down"][0]]
+                else: # Fallback к пустой заглушке
+                     dummy = pygame.Surface((32, 32))
+                     dummy.fill((255, 0, 255))
+                     animations["shovel_swing"] = [dummy]
+        else:
+            print(f"Предупреждение: Папка анимации взмаха лопатой не найдена: {shovel_swing_sprites_dir}")
+            if animations["down"]: # Fallback к анимации "вниз"
+                 animations["shovel_swing"] = [animations["down"][0]]
+            else: # Fallback к пустой заглушке
+                 dummy = pygame.Surface((32, 32))
+                 dummy.fill((255, 0, 255))
+                 animations["shovel_swing"] = [dummy]
+
+        print(f"Загружено {len(animations['shovel_swing'])} кадров для анимации взмаха лопатой.")
+
+        # --- Загрузка анимации взмаха лейкой ---
+        watering_can_swing_sprites_dir = os.path.join("sprites", "player", "sprites_tools", "watering_can_swing")
+        # Убедитесь, что у вас есть эти файлы в указанной директории
+        watering_can_swing_files = ["frame_0.png", "frame_1.png"]  # Или больше, если у вас более сложная анимация
+        if os.path.exists(watering_can_swing_sprites_dir):
+            try:
+                loaded_frames = 0
+                for filename in watering_can_swing_files:
+                    img_path = os.path.join(watering_can_swing_sprites_dir, filename)
+                    if os.path.exists(img_path):
+                        sprite = pygame.image.load(img_path).convert_alpha()
+                        # Масштабируйте, если нужно, до размера игрока
+                        # sprite = pygame.transform.scale(sprite, (70, 92))
+                        animations["watering_can_swing"].append(sprite)
+                        loaded_frames += 1
+                    else:
+                        print(
+                            f"Предупреждение: Файл {img_path} не найден для анимации взмаха лейкой. Проверьте имя файла.")
+                if loaded_frames == 0:
+                    print(
+                        f"Предупреждение: Не загружено ни одного кадра для анимации взмаха лейкой из {watering_can_swing_sprites_dir}. Проверьте имена файлов ({', '.join(watering_can_swing_files)}).")
+                    if animations["down"]:  # Fallback к анимации "вниз"
+                        animations["watering_can_swing"] = [animations["down"][0]]
+                    else:  # Fallback к пустой заглушке
+                        dummy = pygame.Surface((32, 32))
+                        dummy.fill((255, 0, 255))
+                        animations["watering_can_swing"] = [dummy]
+            except Exception as e:
+                print(f"Ошибка при загрузке анимации взмаха лейкой из {watering_can_swing_sprites_dir}: {e}")
+                if animations["down"]:  # Fallback к анимации "вниз"
+                    animations["watering_can_swing"] = [animations["down"][0]]
+                else:  # Fallback к пустой заглушке
+                    dummy = pygame.Surface((32, 32))
+                    dummy.fill((255, 0, 255))
+                    animations["watering_can_swing"] = [dummy]
+        else:
+            print(f"Предупреждение: Папка анимации взмаха лейкой не найдена: {watering_can_swing_sprites_dir}")
+            if animations["down"]:  # Fallback к анимации "вниз"
+                animations["watering_can_swing"] = [animations["down"][0]]
+            else:  # Fallback к пустой заглушке
+                dummy = pygame.Surface((32, 32))
+                dummy.fill((255, 0, 255))
+                animations["watering_can_swing"] = [dummy]
+        print(f"Загружено {len(animations['watering_can_swing'])} кадров для анимации взмаха лейкой.")
         return animations
+
+
 
     # --- Добавлен метод handle_input для обработки событий, специфичных для игрока ---
     def handle_input(self, event):
@@ -214,7 +352,10 @@ class Player(pygame.sprite.Sprite):
                                                         Tool):  # Используем isinstance(selected_item, Tool)
                             if selected_item.tool_type == 'hoe' and not self.is_using_tool:
                                 self.use_tool()  # Вызываем метод использования инструмента
-                            # TODO: Добавить проверки для других типов инструментов (топор, лейка и т.д.)
+                            elif selected_item.tool_type == 'shovel' and not self.is_using_tool:  # <-- ДОБАВЬТЕ ЭТОТ БЛОК
+                                self.use_tool()
+                            elif selected_item.tool_type == 'watering_can' and not self.is_using_tool:  # <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+                                self.use_tool()
                         # --- Проверяем, является ли предмет семенем ---
                         elif selected_item and isinstance(selected_item, Seed):
                             target_tile_x, target_tile_y = self.get_tile_in_front()
@@ -410,13 +551,20 @@ class Player(pygame.sprite.Sprite):
                          # else:
                              # print("Не удалось определить координаты тайла перед игроком или GameManager не имеет till_tile.") # Отладочный принт
 
-                # TODO: Добавить вызовы действий для других инструментов в соответствующие моменты анимации
-                # elif self.current_tool_animation_type == 'axe_swing':
-                #     if prev_frame == X and self.tool_use_current_frame == Y:
-                #         self.game.cut_tree(...) # Вызов функции рубки дерева
-                # elif self.current_tool_animation_type == 'watering_can':
-                #     if prev_frame == X and self.tool_use_current_frame == Y:
-                #         self.game.water_tile(...) # Вызов функции полива
+                elif self.current_tool_animation_type == 'shovel_swing':
+                    # Предположим, что действие происходит на том же кадре
+                    if prev_frame == 0 and self.tool_use_current_frame == 1:
+                        target_tile_x, target_tile_y = self.get_tile_in_front()
+                        if self.game and hasattr(self.game, 'untill_tile') and (
+                                target_tile_x != -1 or target_tile_y != -1):
+                            self.game.untill_tile(target_tile_x, target_tile_y)
+                elif self.current_tool_animation_type == 'watering_can_swing':
+                    # Предположим, что действие полива происходит на том же кадре
+                    if prev_frame == 0 and self.tool_use_current_frame == 1:
+                        target_tile_x, target_tile_y = self.get_tile_in_front()
+                        if self.game and hasattr(self.game, 'water_tile') and (
+                                target_tile_x != -1 or target_tile_y != -1):
+                            self.game.water_tile(target_tile_x, target_tile_y)
 
         else:
             # Если нет текущей анимации инструмента или она пуста, сбрасываем флаг использования инструмента
@@ -453,16 +601,16 @@ class Player(pygame.sprite.Sprite):
                 self.tool_use_animation_timer = 0
                 self.tool_use_current_frame = 0
                 self.current_tool_animation_type = 'hoe_swing'
-                # Логика вызова till_tile ПЕРЕНЕСЕНА в update_tool_use_animation!
-            # TODO: Добавить запуск анимаций для других инструментов
-            # elif selected_item.type == 'axe':
-            #     self.is_using_tool = True
-            #     self.tool_use_animation_timer = 0
-            #     self.tool_use_current_frame = 0
-            #     self.current_tool_animation_type = 'axe_swing'
-            # ...
-        # else:
-            # print("В выбранном слоте нет инструмента или предмет не является инструментом.") # Отладочный принт
+            elif selected_item.tool_type == 'shovel':
+                self.is_using_tool = True
+                self.tool_use_animation_timer = 0
+                self.tool_use_current_frame = 0
+                self.current_tool_animation_type = 'shovel_swing'
+            elif selected_item.tool_type == 'watering_can':
+                self.is_using_tool = True
+                self.tool_use_animation_timer = 0
+                self.tool_use_current_frame = 0
+                self.current_tool_animation_type = 'watering_can_swing'
 
     def get_tile_in_front(self):
         """Определяет координаты клетки на карте, которая находится перед игроком."""
